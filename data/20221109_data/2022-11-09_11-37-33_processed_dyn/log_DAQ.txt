@@ -1,0 +1,95 @@
+test selected: dyn
+dynTime = 20 sec
+dt= 0.1 sec
+number of samples= 200
+%%%%%%%%%% start iteration 0 %%%%%%%%%%
+initialize measurement arrays
+connecting to tinkerforge hardware...
+done connecting
+showing intial raw values
+Pressure PX-1: 12.662774 mA
+Pressure PX-2: 3.94162 mA
+Position ZX-1: 18.10989 mA
+Load Cell LC-1: 273 g
+-------begin tinkerforge configuration-------
+PX1 & PX2 sampling rate config = 2
+ZX1 sampling rate config = 2
+LC1 moving average (1=off) = 1
+LC1 config (RATE_10HZ = 0, GAIN_128X = 0 (2mV/V))= Configuration(rate=0, gain=0)
+-------end tinkerforge configuration-------
+unlock pneumatic brakes
+lock pneumatic brakes
+dynamic step test selected
+dynamic test running...
+sequence to unlock brakes
+piezo current = 20.0 mA
+hold 2 sec...
+unlock pneumatic brakes
+hold 2 sec...
+piezo current = 4.0 mA
+hold 2 sec...
+...dynamic test complete
+lock pneumatic brakes
+disable peizo output
+experiment complete
+logging data at: 20221109-113733
+creating new directory: /Users/raymondturrisi/Library/CloudStorage/OneDrive-Personal/src/mit/classes/2022_fa/2_151/project/code/data/2022-11-09_11-37-33_raw_dyn
+writing raw data to csv
+creating new directory: /Users/raymondturrisi/Library/CloudStorage/OneDrive-Personal/src/mit/classes/2022_fa/2_151/project/code/data/2022-11-09_11-37-33_processed_dyn
+subtracting initial time value from each set
+----Pre-Processed PY1-------
+dt_mean= 0.09950784464321609
+dt_std= 0.008121929042619687
+dt_max= 0.19169387500000035
+dt_min= 0.048296541000000914
+----Pre-Processed PX1-------
+dt_mean= 0.099512007959799
+dt_std= 0.012988220593870817
+dt_max= 0.23776208399999987
+dt_min= 0.0017720409999988362
+----Pre-Processed PX2-------
+dt_mean= 0.09950615473366835
+dt_std= 0.012914764633760598
+dt_max= 0.2375784999999997
+dt_min= 0.0017663330000008415
+----Pre-Processed ZX1-------
+dt_mean= 0.0996790150753769
+dt_std= 0.013481823531735037
+dt_max= 0.20744654199999957
+dt_min= 0.0017641250000011155
+----Pre-Processed LC1-------
+dt_mean= 0.09964972215075377
+dt_std= 0.01380711987537363
+dt_max= 0.2091935419999995
+dt_min= 0.0017652500000000515
+resampling data using linear interpolation
+----Post-Processed PY1-------
+dt_mean= 0.10051807656852793
+dt_std= 9.161184989577856e-16
+dt_max= 0.10051807656853029
+dt_min= 0.10051807656852674
+----Post-Processed PX1-------
+dt_mean= 0.10052228215228429
+dt_std= 8.612572537530209e-16
+dt_max= 0.10052228215228709
+dt_min= 0.10052228215228354
+----Post-Processed PX2-------
+dt_mean= 0.10051636950253809
+dt_std= 9.02701936213402e-16
+dt_max= 0.1005163695025395
+dt_min= 0.10051636950253595
+----Post-Processed ZX1-------
+dt_mean= 0.10069098477157361
+dt_std= 9.122242372587702e-16
+dt_max= 0.10069098477157468
+dt_min= 0.10069098477157112
+----Post-Processed LC1-------
+dt_mean= 0.10066139445685279
+dt_std= 8.615823518467503e-16
+dt_max= 0.10066139445685351
+dt_min= 0.10066139445684996
+writing processed data to csv
+writing processed data to a compiled csv
+%%%%%%%%%% end iteration 0 %%%%%%%%%%
+End of Experiment
+writing log file
