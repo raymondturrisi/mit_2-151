@@ -1,3 +1,25 @@
+/**
+ * @file system_ctrl.hpp
+ * @author Raymond Turrisi <rturrisi (at) mit (dot) edu>
+ * @brief System controller for the McKibben Actuator Test setup originally designed by Peter G. Morice
+ * 
+ * Here we have a minimal suitable implementation to last the lifetime of the project. Here you will find: 
+ * McKibben Commander: 
+ *  - A class which maintains the communications with the experimental setup/tinkerforge bricks
+ *  - Methods for simplifiying the control process
+ * Dynamic Test:
+ *  - A class for managing dynamic tests with common functions and utilities for:
+ *  - step input (WIP)
+ *  - ramp input (TOOD)
+ *  - Frequency Response (TODO)
+ *  - Initial condition response (TODO)
+ * @version 0.1
+ * @date 2022-11-19
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
+
 #include "ip_connection.h"
 #include "brick_master.h"
 #include "bricklet_industrial_analog_out_v2.h"
@@ -8,10 +30,27 @@
 #include <string>
 #include <cstring>
 #include <chrono>
+#include <vector>
+#include <thread>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define HOST "localhost"
 #define PORT 4223
 using namespace std;
+
+
+int dirExists(const char *path)
+{
+    struct stat info;
+
+    if(stat( path, &info ) != 0)
+        return 0;
+    else if(info.st_mode & S_IFDIR)
+        return 1;
+    else
+        return 0;
+}
 
 template <typename T> class Reading {
     //TODO: Change types to reading class and add time stamps at the time something is pulled
@@ -199,6 +238,8 @@ class McKibbenCommander {
                 
 
                 load_cell_v2_create(&m_load_cell, m_uid_load_cell.c_str(), &m_ipcon);
+                //sets the configuration to sample at 80 Hz
+                load_cell_v2_set_configuration(&m_load_cell,1,0);
                 if((last_err = load_cell_v2_get_weight(&m_load_cell, &m_weight_grams_dto)) < 0) {
                     fprintf(stderr, "ERR [%d]: Could not connect to load cell\n", last_err);
                     return false;
@@ -467,6 +508,71 @@ class McKibbenCommander {
             return repr(",");
         }
 
+        void raise_brakes() {
+            this->disable_brakes();
+            m_timenow = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed_milliseconds = m_timenow - m_timestart;
+            float lb=6000.0, ub = 20000.0;
+            int steps = 40;
+            int duration = 3000; //ms
+            int time_interval = duration/steps;
+            float increments = (ub-lb)/steps;
+            int wait_time = 1000;
+            for(int i = lb; i < ub; i+=increments) {
+                this->set_pressure_output(i);
+                this_thread::sleep_for(chrono::milliseconds(time_interval));
+            }
+            this_thread::sleep_for(chrono::milliseconds(wait_time));
+            this->enable_brakes();
+            this_thread::sleep_for(chrono::milliseconds(100));
+            this->set_pressure_output(0);
+        }
+};
+
+//Data transfer object
+
+class Sequence {
+    public:
+        vector<float> m_times; //times for an event to occur
+        vector<float> m_magnitude; //pressures in millivolts (0 to 10000)
+        uint32_t size;
+        Sequence() {
+            size=0;
+        }
+        void push_back(float second, float magnitude_mv) {
+            if(size == 0) {
+                if(abs(second) >= 0.02) {
+                    fprintf(stderr, "Error: Sequence <push_back>: Must specify an initial condition at time = 0 seconds. Got [%f, %f]\n", second, magnitude_mv);
+                    exit(1);
+                }
+            } 
+
+            if(second > 100) {
+                fprintf(stdout, "Warning: Test is exceeding over 100 seconds\n");
+            }
+            if(magnitude_mv < 0 || magnitude_mv > 20000) {
+                fprintf(stderr, "Error: Sequence <push_back>: Magnitude in millivolts is out of bounds. Received (%f), bounds [0, 20000]\n", magnitude_mv);
+                exit(1);
+            }
+            m_times.push_back(second);
+            m_magnitude.push_back(magnitude_mv);
+            size++;
+        }
+
+        void operator = (const Sequence &seq_to_copy ) { 
+            m_times = seq_to_copy.m_times;
+            m_magnitude = seq_to_copy.m_magnitude;
+            size = seq_to_copy.size;
+      }
+
+      string repr() {
+            string repr_result = "[";
+            for (int i = 0; i < size; i++) {
+                repr_result+="["+to_string(m_times[i])+","+to_string(m_magnitude[i])+"]";
+            }
+            repr_result+="]";
+            return repr_result;
+        }
 };
 
 class DynamicTest {
@@ -478,8 +584,152 @@ class DynamicTest {
             initialization is reached
         [ ] Compose utility functions for developing sequences for ramp, step, and sinusoidal patterns
      */
-    private:
-
     public:
+        McKibbenCommander *m_commander;
+        bool m_explicit_sample_intervals;
+        int m_dt;
+        string m_latest_nickname;
+        Sequence m_latest_sequence;
+        string m_fname;
 
+        DynamicTest(McKibbenCommander *commander) {
+            m_commander = commander;
+            m_explicit_sample_intervals = false;
+            m_dt = -1;
+            m_latest_nickname = "";
+        };
+        ~DynamicTest() {
+            m_commander->~McKibbenCommander();
+        }
+        void m_run_step(Sequence step_sequence, float dt, string nickname) {
+            /*
+                TODO: 
+                [ ] Simplify common actions into functions to be used for other dynamic tests
+                [ ] Utilize the nickname feature
+                [ ] Remove repeated/unused variables
+            */
+            m_latest_nickname = nickname;
+            m_latest_sequence = step_sequence;
+            //Check inputs
+            if(step_sequence.size < 2) {
+                fprintf(stderr, "Error: DynamicTest <m_run_step> - Sequence must contain at least two members\n");
+            }
+            if(dt < 0) {
+                m_explicit_sample_intervals = false;
+            } else {
+                if(dt < 0.004 && dt >= 0) {
+                    fprintf(stdout, "Warning: DynamicTest <m_run_step> - Sample time is less than fastest observed sample time of 0.004 seconds (4 ms/250 Hz). Received %f\n", dt);
+                }
+                m_explicit_sample_intervals = true;
+                m_dt = dt*1000; //seconds to milliseconds
+            }
+        
+            FILE *data_fptr;
+            FILE *notes_fptr;
+            time_t rawtime;
+            struct tm * timeinfo;
+            char dirname_buf [256];
+            char data_fname_buf [256];
+            char notes_fname_buf [256];
+            char data_fname_full_buf [256];
+            char notes_fname_full_buf [256];
+            memset(data_fname_buf, '\0', 256);
+            memset(notes_fname_buf, '\0', 256);
+            memset(dirname_buf, '\0', 256);
+            memset(data_fname_full_buf, '\0', 256);
+            memset(notes_fname_full_buf, '\0', 256);
+            time (&rawtime);
+            timeinfo = localtime (&rawtime);
+            strftime (dirname_buf,256,"data/%F_exps",timeinfo);
+            if (!dirExists("data")) {
+                if (mkdir("data", 0777) == -1)
+                    fprintf(stderr, "Error: DynamicTest <m_run_step> - Cannot make directory data/- %s\n", strerror(errno));
+            }
+            if (!dirExists(dirname_buf)) {
+                if (mkdir(dirname_buf, 0777) == -1)
+                    fprintf(stderr, "Error: DynamicTest <m_run_step> - Cannot make directory data/*exp/- %s\n", strerror(errno));
+            }
+
+            strftime (data_fname_buf,256,"%F_%H%M%S_data.dat",timeinfo);
+            strftime (notes_fname_buf,256,"%F_%H%M%S_notes.dat",timeinfo);
+            snprintf(data_fname_full_buf, 256, "%s/%s", dirname_buf, data_fname_buf);
+            snprintf(notes_fname_full_buf, 256, "%s/%s", dirname_buf, notes_fname_buf);
+
+            //printf("%s\n%s\n%s\n", dirname_buf, data_fname_full_buf, notes_fname_full_buf);
+
+            std::chrono::time_point<std::chrono::high_resolution_clock> test_start, now, next_sample;
+            test_start = std::chrono::high_resolution_clock::now();
+            now = std::chrono::high_resolution_clock::now();
+            next_sample = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = now - test_start;
+            
+            //Raise brakes
+            float lag_time = 3;
+            printf("- - RAISING BRAKES: %0.2f seconds to clear space - abort with Ctrl-C - - -\n", lag_time/1000);
+            while((duration.count()) < lag_time) {
+                printf("%0.2f s / %0.2f s\r", duration.count(), lag_time);
+                now = std::chrono::high_resolution_clock::now();
+                duration = now - test_start;
+            }
+            printf("\n");
+            m_commander->raise_brakes();
+
+            //Go to initial value and hold for 5 seconds
+
+            test_start = std::chrono::high_resolution_clock::now();
+            now = std::chrono::high_resolution_clock::now();
+            duration = now - test_start;
+            float rest_time = 5;
+            
+            int lb=0, ub = step_sequence.m_magnitude[0];
+            int steps = 40;
+            int action_span = rest_time*1000; //ms
+            int time_interval = action_span/steps;
+            float increments = (ub-lb)/steps;
+            int wait_time = 1000;
+            for(int i = lb; i < ub; i+=(int)increments) {
+                now = std::chrono::high_resolution_clock::now();
+                duration = now - test_start;
+                m_commander->set_pressure_output(i);
+                this_thread::sleep_for(chrono::milliseconds(time_interval));
+                printf("Going to initial conditions: %0.2f s / %0.2f s\r", duration.count(), rest_time);
+            }
+            printf("\n");
+
+            this_thread::sleep_for(chrono::milliseconds(wait_time));
+            test_start = std::chrono::high_resolution_clock::now();
+            now = std::chrono::high_resolution_clock::now();
+            duration = now - test_start;
+            double start_time = duration.count();
+            printf("- - Starting Test - -\n");
+            m_commander->m_reset_time();
+            data_fptr = fopen(data_fname_full_buf, "a");
+            fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
+            fclose(data_fptr);
+            for(int i = 0; i <= step_sequence.size; i++) {
+                float t = 0;
+                if(i!=step_sequence.size-1) {
+                    t = step_sequence.m_times[i+1];
+                }
+                int mag = (int)step_sequence.m_magnitude[i];
+                bool sig_out = false;
+                while((duration.count()) < start_time+t) {
+                    data_fptr = fopen(data_fname_full_buf, "a");
+                    m_commander->read_all();
+                    fprintf(data_fptr, "%s\n", m_commander->repr().c_str());
+                    now = std::chrono::high_resolution_clock::now();
+                    duration = now - test_start;
+                    if(!sig_out) {
+                        m_commander->set_pressure_output(mag);
+                        sig_out = true;
+                    }
+                    fclose(data_fptr);
+                    if(m_explicit_sample_intervals) {
+                        this_thread::sleep_for(chrono::milliseconds(m_dt));
+                    }
+                }
+                m_commander->set_pressure_output(0);
+            }
+            printf("- - TEST DONE - -\n");
+        }
 };

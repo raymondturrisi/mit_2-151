@@ -1,4 +1,13 @@
-
+/**
+ * @file simple_demo.cpp
+ * @author Raymond Turrisi <rturrisi (at) mit (dot) edu>
+ * @brief Demonstration for how to use the McKibben Commander class
+ * @version 0.1
+ * @date 2022-11-19
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 #include "../lib/system_ctrl.hpp"
 #include <stdio.h>
 #include <unistd.h>
@@ -101,9 +110,10 @@ int main(int ac, char* av[]) {
             your computer is a little slow - should take about 30 seconds or so
         */
         if(i %100 == 0) {
-            printf("%f: On: %d/%d\n", duration.count(), i,(ub-lb));
+            printf("%f: On - %d/%d\n", duration.count(), i,(ub-lb));
         }
     }
+
     commander.set_pressure_output(0);
     fclose(fptr);
     sleep(1);
