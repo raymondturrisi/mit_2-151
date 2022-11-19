@@ -1,0 +1,29 @@
+# hardware addresses
+
+#addresses
+HOST = "localhost"
+PORT = 4223
+
+UID_py1 = "GZM" # peizo output
+UID_k1 = "Kr4" # relay output
+UID_px = "Hfe" # pressure sensors (supply & controlled)
+UID_zx1 = "Ji8" # position sensor
+UID_lc1 = "S1C" # load cell
+UID_master1 = "6EG9ps"
+UID_master2 = "6s6yLQ"
+
+
+#instantiation
+
+ipcon = IPConnection() # Create IP connection
+        
+        py1 = BrickletIndustrialAnalogOutV2(UID_py1, ipcon) # peizo output
+        k1 = BrickletIndustrialDualRelay(UID_k1, ipcon) # relay output
+        px = BrickletIndustrialDual020mAV2(UID_px, ipcon) # pressure sensors
+        zx1 = BrickletIndustrialDual020mAV2(UID_zx1, ipcon) # position sensor
+        lc1 = BrickletLoadCellV2(UID_lc1, ipcon) # load cell 
+        master1 = BrickMaster(UID_master1, ipcon) 
+        master2 = BrickMaster(UID_master2, ipcon)
+
+
+ 

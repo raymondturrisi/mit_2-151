@@ -1,0 +1,13 @@
+#choose what files to ignore in the repo
+
+#ignore all object files
+*.o
+*.so
+
+#ignore .mat files - these are considered temporary unless you manually add them
+*.mat
+
+#ignore all executables
+*.exe
+
+
