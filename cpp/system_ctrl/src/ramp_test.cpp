@@ -1,7 +1,7 @@
 /**
- * @file rt_testing.cpp
+ * @file ramp_test.cpp
  * @author Raymond Turrisi <rturrisi (at) mit (dot) edu>
- * @brief A real time testing play program - not for serious use - only development
+ * @brief Demonstration of ramp input tests
  * @version 0.1
  * @date 2022-11-19
  * 
@@ -18,7 +18,6 @@
 static void *callback_data;
 void sig_handler(int signum) {
     McKibbenCommander *commander_ref = (McKibbenCommander*)callback_data;
-    printf("Callback %s\n", commander_ref->repr().c_str());
     commander_ref->~McKibbenCommander();
     exit(signum);
 }
@@ -33,9 +32,11 @@ int main(int ac, char* av[]) {
         exit(1);
     }
     /*
+        IMPORTANT
         Assign commander pointer to a general void pointer, and then register the signal 
         handler which uses this data to ensure a safe shutdown of the system with an 
         early termination
+        Alternatively, you will need to open brickv and connect in order to restore the system
     */
     callback_data = (void*)&commander;
     signal(SIGINT, sig_handler); //ctrl-c
@@ -44,13 +45,16 @@ int main(int ac, char* av[]) {
     signal(SIGQUIT, sig_handler);
     commander->initSystem();
 
+    //instantiate a dynamic test
     DynamicTest dyn_test(commander);
-
+    //can modify default parameters - verbose is by default off, and the update frequency if you enable verbose
     Sequence sequence;
-    sequence.push_back(0, 4000);
-    sequence.push_back(10, 12000);
-    sequence.push_back(15, 4000);
-    sequence.push_back(20, 0);
-    dyn_test.m_run_step(sequence, -1, "nickname");
+    sequence.push_back(0, 2000); //start at 4000, after getting there provide a 10 second resting time for the system
+    sequence.push_back(10, 10000); //at 10 seconds, send a step signal to 12000
+    sequence.push_back(15, 8000);
+    sequence.push_back(20, 0); //at time 20, the test will terminate, and send a signal of 0 - you should put zero here, but it will automatically deflate the actuator
+    bool verbose = true; // whether or not you want to be updated during the test - not advised for high performance sampling
+    float update_frq = 0.1; // frequency which you want to receive updates - the more printouts you receive per second the greater you comprimise performance
+    dyn_test.run_ramp(sequence, -1, "ramp", verbose, update_frq);
     return 0;
 }

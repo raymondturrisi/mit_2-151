@@ -1,9 +1,13 @@
 #!/bin/bash
-clang++ -I ../tinkerforge_libc/source/ -I lib/ \
+clang++ -O3 -I ../tinkerforge_libc/source/ -I lib/ \
 src/simple_demo.cpp ../tinkerforge_libc/source/*.o \
 -o bin/simple_demo.exe 
 
 
-clang++ -I ../tinkerforge_libc/source/ -I lib/ \
-src/rt_testing.cpp ../tinkerforge_libc/source/*.o \
--o bin/rt_testing.exe 
+clang++ -O3 -I ../tinkerforge_libc/source/ -I lib/ \
+src/step_test.cpp ../tinkerforge_libc/source/*.o \
+-o bin/step_test.exe 
+
+clang++ -O3 -I ../tinkerforge_libc/source/ -I lib/ \
+src/ramp_test.cpp ../tinkerforge_libc/source/*.o \
+-o bin/ramp_test.exe 
