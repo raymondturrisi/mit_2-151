@@ -42,8 +42,8 @@ using namespace std;
 /**
  * @brief Check to see if a directory exists
  *  taken from stackoverflow
- * @param path 
- * @return int 
+ * @param path
+ * @return int
  */
 int dirExists(const char *path)
 {
@@ -241,7 +241,7 @@ public:
 
             load_cell_v2_create(&m_load_cell, m_uid_load_cell.c_str(), &m_ipcon);
             // sets the configuration to sample at 80 Hz
-            //load_cell_v2_set_configuration(&m_load_cell, 1, 0);
+            // load_cell_v2_set_configuration(&m_load_cell, 1, 0);
             load_cell_v2_set_configuration(&m_load_cell, 0, 0);
             if ((last_err = load_cell_v2_get_weight(&m_load_cell, &m_weight_grams_dto)) < 0)
             {
@@ -810,7 +810,8 @@ public:
         fclose(notes_ptr);
     }
 
-    void term_notes(string notes_fname) {
+    void term_notes(string notes_fname)
+    {
         FILE *notes_ptr = fopen(notes_fname.c_str(), "a");
         fprintf(notes_ptr, "\n\n");
         for (int i = 0; i < 70; i++)
@@ -822,12 +823,12 @@ public:
 
     /**
      * @brief Provide a step input to the system
-     * 
+     *
      * @param step_sequence Sequence of events times and desired magnitudes
      * @param dt A specified sample interval - use -1 for fastest, while anything >0 for a specific interval - may result in unwanted consequences
-     * @param nickname 
-     * @param verbose 
-     * @param update_frq 
+     * @param nickname
+     * @param verbose
+     * @param update_frq
      */
     void run_step(Sequence step_sequence, float dt, string nickname, bool verbose, float update_frq)
     {
@@ -855,7 +856,7 @@ public:
         FILE *data_fptr;
         FILE *notes_fptr;
         string data_fname, notes_fname;
-        get_fnames(data_fname, notes_fname, nickname);        
+        get_fnames(data_fname, notes_fname, nickname);
 
         // Raise brakes and give the user time to respond
         m_config_system();
@@ -873,11 +874,11 @@ public:
         printf("- - Test In Progress - -\n");
         m_commander->m_reset_time();
         data_fptr = fopen(data_fname.c_str(), "a");
-        
+
         fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
-        fprintf(notes_fptr, "Sequence: \n\t-%s",step_sequence.repr("\n\t-").c_str());
+        fprintf(notes_fptr, "Sequence: \n\t-%s", step_sequence.repr("\n\t-").c_str());
         fclose(notes_fptr);
         /*
             Here, we expect that a sequence is provided by event driven time steps. I.e. if a sequence time/mag pair is [10, 10000],
@@ -952,8 +953,8 @@ public:
      *  Warning - to maintain maximum sampling frequency, we have to make some approximations
      * We break the input into 100 steps, and also the estimated time between steps. We hold at a signal step until the signal step time has reached the
      * fixed estimated time between signals. We correct this by looking to see the deviation between the desired slope and effective slope. With this, you will notice
-     * that your actual time may slightly exceed your desired time. Currently a low priority fix. 
-     * 
+     * that your actual time may slightly exceed your desired time. Currently a low priority fix.
+     *
      * @param ramp_sequence Sequence of times and magnitudes - steps are broken into 100 steps
      * @param dt -1 if you want the fastest sample rate, > 0 if you want to impose a specific sample rate
      * @param nickname A nickname to appear in the files
@@ -987,7 +988,7 @@ public:
         FILE *notes_fptr;
         string data_fname, notes_fname;
         get_fnames(data_fname, notes_fname, nickname);
-        
+
         // Raise brakes and give the user time to respond
         m_config_system();
 
@@ -999,20 +1000,19 @@ public:
         block_time = time_zero;
         now = time_zero;
         next_sample = time_zero;
-        std::chrono::duration<double> time_span = now-time_zero, block_span = now-time_zero;
-
+        std::chrono::duration<double> time_span = now - time_zero, block_span = now - time_zero;
 
         double start_time = time_span.count();
 
         printf("- - Test In Progress - -\n");
         m_commander->m_reset_time();
         data_fptr = fopen(data_fname.c_str(), "a");
-        
+
         fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
         fclose(data_fptr);
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
-        fprintf(notes_fptr, "Sequence: \n\t-%s",ramp_sequence.repr("\n\t-").c_str());
+        fprintf(notes_fptr, "Sequence: \n\t-%s", ramp_sequence.repr("\n\t-").c_str());
         fclose(notes_fptr);
         /*
             Here, we expect that a sequence is provided by event driven time steps. I.e. if a sequence time/mag pair is [10, 10000],
@@ -1048,26 +1048,29 @@ public:
             */
             float init = ramp_sequence.m_magnitude[i], fv;
             float init_time = ramp_sequence.m_times[i], fv_time;
-            if (i != ramp_sequence.size-1) {
-                fv = ramp_sequence.m_magnitude[i+1];
-                fv_time = ramp_sequence.m_times[i+1];
-            } else {
+            if (i != ramp_sequence.size - 1)
+            {
+                fv = ramp_sequence.m_magnitude[i + 1];
+                fv_time = ramp_sequence.m_times[i + 1];
+            }
+            else
+            {
                 fv = ramp_sequence.m_magnitude[i];
                 fv = ramp_sequence.m_times[i];
             }
-            int n_steps = 100; //magic number, chosen arbitrarily - something that should be chosen explicitly however so testing is consistent due to hardware limitations
+            int n_steps = 100; // magic number, chosen arbitrarily - something that should be chosen explicitly however so testing is consistent due to hardware limitations
 
-            float increment = ceil((float)(fv-init)/(float)n_steps);
-            float time_step = (fv_time - init_time)/(float)n_steps;
-            float slope_wrt_time = (fv-init)/(fv_time - init_time);
-            int sign_flip = (fv - init)/abs(fv - init); //returns +- 1 for if the slope is positive or negative
+            float increment = ceil((float)(fv - init) / (float)n_steps);
+            float time_step = (fv_time - init_time) / (float)n_steps;
+            float slope_wrt_time = (fv - init) / (fv_time - init_time);
+            int sign_flip = (fv - init) / abs(fv - init); // returns +- 1 for if the slope is positive or negative
             float eps = 0.001;
-            //run until we are diverging from the goal
+            // run until we are diverging from the goal
             float correction_factor = 1;
-            for(float sig = init; sign_flip*(fv - sig) > sign_flip*eps; sig+=increment)
+            for (float sig = init; sign_flip * (fv - sig) > sign_flip * eps; sig += increment)
             {
-                //this block should take exactly 1 time step to complete, if it does not, then we hold and continue reading
-                //TODO: Include timer for this problem - currently we established how to increment signals, but not how to manage time
+                // this block should take exactly 1 time step to complete, if it does not, then we hold and continue reading
+                // TODO: Include timer for this problem - currently we established how to increment signals, but not how to manage time
                 m_commander->set_pressure_output((int)sig);
                 m_commander->read_all();
                 pre_time = time_span.count();
@@ -1095,11 +1098,12 @@ public:
                     fflush(stdout);
                     next_update = time_span.count() + update_frq;
                 }
-                while(block_span.count() < time_step*correction_factor*correction_factor) {
+                while (block_span.count() < time_step * correction_factor * correction_factor)
+                {
                     block_time = std::chrono::high_resolution_clock::now();
                     now = std::chrono::high_resolution_clock::now();
                     block_span = block_time - block_start;
-                    time_span = now-time_zero;
+                    time_span = now - time_zero;
                     /*
                         This read_all function has been observed to take ~5-10 ms - when it was left out this block could write the data
                         (stale data) at extremely high frequencies
@@ -1108,24 +1112,110 @@ public:
                     fprintf(data_fptr, "%s\n", m_commander->repr().c_str());
                 }
                 /*
-                    We have a correction factor to account for the difference between our actual slope and effectively slope - 
-                    it was observed that we would not complete the sequence in time, therefore if we are undershooting our target, we need to 
-                    spend less time in the block above, and reduce the timestep. 
-                    We take the percent error between the desired slope and the effective slope, where if the effective slope is less than desired slope, 
+                    We have a correction factor to account for the difference between our actual slope and effectively slope -
+                    it was observed that we would not complete the sequence in time, therefore if we are undershooting our target, we need to
+                    spend less time in the block above, and reduce the timestep.
+                    We take the percent error between the desired slope and the effective slope, where if the effective slope is less than desired slope,
                     we end up with a smaller number
                 */
-                if (abs((fv - sig)/(fv - init)) < 0.95) {
-                    //we find the value 5 seconds into the test (15-10)*slope
+                if (abs((fv - sig) / (fv - init)) < 0.95)
+                {
+                    // we find the value 5 seconds into the test (15-10)*slope
 
-                    float effective_slope = (sig-init)/(time_span.count()-ramp_sequence.m_times[i]); //effective slope from initial conditions
-                    //printf("s %f es %f tdiff %f\n", slope_wrt_time, effective_slope, (time_span.count()-ramp_sequence.m_times[i]));
-                    correction_factor = 1-(slope_wrt_time - effective_slope)/slope_wrt_time;//this reduces the timestep to catch up to the desired slope
-                    //printf("cf: %f, %f\n", correction_factor, abs((fv - sig)/(fv - init)));
+                    float effective_slope = (sig - init) / (time_span.count() - ramp_sequence.m_times[i]); // effective slope from initial conditions
+                    // printf("s %f es %f tdiff %f\n", slope_wrt_time, effective_slope, (time_span.count()-ramp_sequence.m_times[i]));
+                    correction_factor = 1 - (slope_wrt_time - effective_slope) / slope_wrt_time; // this reduces the timestep to catch up to the desired slope
+                    // printf("cf: %f, %f\n", correction_factor, abs((fv - sig)/(fv - init)));
                 }
             }
             fclose(data_fptr);
             m_commander->set_pressure_output(0);
         }
+        printf("\n");
+        term_notes(notes_fname);
+        printf("- - TEST DONE - -\n");
+    }
+
+    void run_frq_response(float center_pressure, float amplitude, float frq_rads, float duration, string nickname, bool verbose, float update_frq)
+    {
+        /*
+            FREQUENCY RESPONSE TEST
+            Here we are to observe histeresis in the actuator, as well as the thermo dynamic response when subject to fast oscillations for an extended period of time
+            The expectation for what this function will do, is you provide a single frequency, a centered pressure, an amplitude, and a duration, st.
+            It provides these oscillations for some period of time
+        */
+        m_latest_nickname = nickname;
+        printf("Notice: Dynamic Test <run_frq_response> Selected\n");
+        FILE *data_fptr;
+        FILE *notes_fptr;
+        string data_fname, notes_fname;
+        get_fnames(data_fname, notes_fname, nickname);
+
+        // Raise brakes and give the user time to respond
+        m_config_system();
+
+        // Go to initial value and hold for some number of seconds to reach an equilibrium
+        Sequence pseu_sequence;
+        pseu_sequence.push_back(0, center_pressure);
+        m_go_to_ics(pseu_sequence);
+
+        std::chrono::time_point<std::chrono::high_resolution_clock> time_zero, now, next_sample;
+        time_zero = std::chrono::high_resolution_clock::now();
+        now = time_zero;
+        next_sample = time_zero;
+        std::chrono::duration<double> time_span = now - time_zero; // general case
+
+        double start_time = time_span.count();
+
+        printf("- - Test In Progress - -\n");
+        m_commander->m_reset_time();
+        data_fptr = fopen(data_fname.c_str(), "a");
+
+        fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
+        init_notes(notes_fname);
+        notes_fptr = fopen(notes_fname.c_str(), "a");
+        fprintf(notes_fptr, "Frequency response parameters:\
+            \r\t- Frequency: %0.3f rad/s\
+            \r\t- Center Pressure: %0.1f mV\
+            \r\t- Amplitude: %0.1f mV\
+            \r\t- Duration: %0.2f s\n", 
+            frq_rads, 
+            center_pressure, 
+            amplitude, 
+            duration);
+
+        fclose(notes_fptr);
+        /*
+            Here, we expect that a sequence is provided by event driven time steps. I.e. if a sequence time/mag pair is [10, 10000],
+            at 10 seconds we will provide a 10000 mA input to the system
+
+            We iterate over each of these sequences and hold at the position capturing/reading the data until the next event
+        */
+
+        float hardware_timer_err = 0, accumulated_err = 0;
+        ;
+        float pre_time = 0;
+        float post_time = 0;
+        float next_update = 0;
+        uint64_t samples = 1;
+        // iterate over each pair in the sequence, and hold a magnitude until the next event is reached
+        data_fptr = fopen(data_fname.c_str(), "a");
+        while(time_span.count() < duration) {
+            m_commander->read_all();
+            fprintf(data_fptr, "%s\n", m_commander->repr().c_str());
+            now = std::chrono::high_resolution_clock::now();
+            time_span = now - time_zero;
+            float mag_out = center_pressure+amplitude*sin(frq_rads*time_span.count());
+            m_commander->set_pressure_output((int)mag_out);
+            if (verbose && time_span.count() > next_update)
+            {
+                printf("%0.2f s / %0.2f s\r", time_span.count(), duration);
+                fflush(stdout);
+                next_update = time_span.count() + update_frq;
+            }
+        }
+        fclose(data_fptr);
+        m_commander->set_pressure_output(0);
         printf("\n");
         term_notes(notes_fname);
         printf("- - TEST DONE - -\n");
