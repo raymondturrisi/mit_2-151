@@ -217,6 +217,8 @@ public:
                 fprintf(stderr, "ERR [%d]: Could not connect to pressure sensors\n", last_err);
                 return false;
             }
+            industrial_dual_0_20ma_v2_set_sample_rate(&m_pressure_sensors, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
+            industrial_dual_0_20ma_v2_set_sample_rate(&m_position_sensor, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
             m_compressor_p_ma = (float)m_compressor_p_ma_dto / 1000000.0;
             if ((last_err = industrial_dual_0_20ma_v2_get_current(&m_pressure_sensors, 0, &m_piezo_p_ma_dto)) < 0)
             {
@@ -1172,6 +1174,7 @@ public:
         data_fptr = fopen(data_fname.c_str(), "a");
 
         fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
+        fclose(data_fptr);
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
         fprintf(notes_fptr, "Frequency response parameters:\
@@ -1193,7 +1196,6 @@ public:
         */
 
         float hardware_timer_err = 0, accumulated_err = 0;
-        ;
         float pre_time = 0;
         float post_time = 0;
         float next_update = 0;

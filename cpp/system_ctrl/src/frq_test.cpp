@@ -51,8 +51,8 @@ int main(int ac, char* av[]) {
     bool verbose = true; // whether or not you want to be updated during the test - not advised for high performance sampling
     float update_frq = 0.1; // frequency which you want to receive updates - the more printouts you receive per second the greater you comprimise performance
     float center_pressure = 5000; //mV
-    float amplitude = 3000; //mV
-    float desired_frq_hz = 0.5;
+    float amplitude = 5000; //mV
+    float desired_frq_hz = 0.25;
     float frq_rads = 2*3.14*desired_frq_hz;
     float duration = 120;
     dyn_test.run_frq_response(center_pressure, amplitude, frq_rads, duration, "frq", verbose, update_frq);
