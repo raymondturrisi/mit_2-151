@@ -1,0 +1,20 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi     
+Nickname: characterization        
+Date: Tue Nov 22 19:48:50 2022        
+User Notes:        
+    Preliminary characterization test - first full run of script - there 
+	is a 2 percent offset/epsilon from initial conditions to try to mask 
+	the weight of the bearings
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+System Characterization Parameters:            
+	- Lower bound: 0.00 percent            
+	- Upper bound: 100.00 percent            
+	- Step size: 5.00 percent
+
+
+**********************************************************************|

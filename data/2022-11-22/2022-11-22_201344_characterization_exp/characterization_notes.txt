@@ -1,0 +1,19 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi      
+Nickname: characterization        
+Date: Tue Nov 22 20:13:44 2022        
+User Notes:        
+    Shorter test under the same conditions as the previous/nearest 
+	characterization test. 
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+System Characterization Parameters:            
+	- Lower bound: 0.00 percent            
+	- Upper bound: 100.00 percent            
+	- Step size: 10.00 percent
+
+
+**********************************************************************|
