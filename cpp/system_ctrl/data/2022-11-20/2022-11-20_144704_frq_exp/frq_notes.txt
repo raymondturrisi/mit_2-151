@@ -1,11 +1,0 @@
-**********************************************************************|
-NOTES FILE FOR TEST
-        Test Conducted by: <NAME>        Nickname: frq        Date: Sun Nov 20 14:47:19 2022        User Notes:        
-        
-        
-----------------------------------------------------------------------|
-SYSTEM OUTPUT
-Frequency response parameters:            	- Frequency: 3.140 rad/s            	- Center Pressure: 5000.0 mV            	- Amplitude: 3000.0 mV            	- Duration: 120.00 s
-
-
-**********************************************************************|
