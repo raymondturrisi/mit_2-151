@@ -15,3 +15,7 @@ src/ramp_test.cpp ../tinkerforge_libc/source/*.o \
 clang++ -O3 -I ../tinkerforge_libc/source/ -I lib/ \
 src/frq_test.cpp ../tinkerforge_libc/source/*.o \
 -o bin/frq_test.exe 
+
+clang++ -O3 -I ../tinkerforge_libc/source/ -I lib/ \
+src/char_test.cpp ../tinkerforge_libc/source/*.o \
+-o bin/char_test.exe 

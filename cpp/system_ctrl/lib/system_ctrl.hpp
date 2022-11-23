@@ -9,10 +9,10 @@
  *  - Methods for simplifiying the control process
  * Dynamic Test:
  *  - A class for managing dynamic tests with common functions and utilities for:
- *  - step input (WIP)
- *  - ramp input (TOOD)
- *  - Frequency Response (TODO)
- *  - Initial condition response (TODO)
+ *      - Step response
+ *      - Ramp response
+ *      - Frequency response
+ *      - Region characterization (TODO)
  * @version 0.1
  * @date 2022-11-19
  *
@@ -107,7 +107,7 @@ public: // this would normally be private, but leaving it open incase people wan
     LoadCellV2 m_load_cell;
 
     // last set pressure
-    float m_millivolt_out;
+    float m_microamp_out;
 
     // variables for immediately cacheing reads/sets
     // TODO: Update these types to "Reading"
@@ -272,7 +272,7 @@ public:
 
         // Pressure output
         // set piezo value to zero, distable output, then destroy the obj
-        industrial_analog_out_v2_set_voltage(&m_piezo_out, 0);
+        industrial_analog_out_v2_set_current(&m_piezo_out, 0);
         industrial_analog_out_v2_set_enabled(&m_piezo_out, false);
         industrial_analog_out_v2_destroy(&m_piezo_out);
 
@@ -449,20 +449,27 @@ public:
         return true;
     }
     /**
-     * @brief Set the pressure output in the form of millivolts
+     * @brief Set the pressure output - takes in a percent representing the total percentage of the output span
+     * 0% corresponds to 4000 microamp, 100% corresponds to 20000 microamps, 56.5% corresponds with 13040 microamps
      *
-     * @param millivolt_out
+     * @param percent_output
      * @return true - if successful
      * @return false - if unsuccesful
      */
-    bool set_pressure_output(int millivolt_out)
+    bool set_pressure_output(float percent_output)
     {
-        if ((last_err = industrial_analog_out_v2_set_voltage(&m_piezo_out, millivolt_out)) < 0)
+        float lb = 4000, ub = 20000;
+        float span = ub - lb;
+        float output = (float)lb + percent_output * (float)span / 100.0;
+        /*
+            A percent output gets turned into the corresponding microamp output
+        */
+        if ((last_err = industrial_analog_out_v2_set_current(&m_piezo_out, (int)output)) < 0)
         {
             fprintf(stderr, "ERR [%d]: Could not set output pressure\n", last_err);
             return false;
         }
-        m_millivolt_out = (float)millivolt_out;
+        m_microamp_out = (float)output;
         return true;
     }
 
@@ -481,6 +488,9 @@ public:
         read_piezo_pressure();
         read_position_sensor();
         read_load_cell();
+        // industrial_dual_0_20ma_v2_set_sample_rate(&m_pressure_sensors, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
+        // industrial_dual_0_20ma_v2_set_sample_rate(&m_position_sensor, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
+        // load_cell_v2_set_configuration(&m_load_cell, 0, 0);
         return;
     }
 
@@ -523,7 +533,7 @@ public:
                  (m_m1_volts + m_m2_volts) / 2.0, delimiter.c_str(),
                  m_compressor_p_ma, delimiter.c_str(),
                  m_piezo_p_ma, delimiter.c_str(),
-                 m_millivolt_out, delimiter.c_str(),
+                 m_microamp_out, delimiter.c_str(),
                  m_vertical_distance_ma, delimiter.c_str(),
                  m_weight_grams);
         return string(buffer);
@@ -543,7 +553,7 @@ public:
         this->disable_brakes();
         m_timenow = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> elapsed_milliseconds = m_timenow - m_timestart;
-        float lb = 4000.0, ub = 20000.0;
+        float lb = 0.0, ub = 100.0;
         int steps = 40;
         int duration = 3000; // ms
         int time_interval = duration / steps;
@@ -1181,11 +1191,11 @@ public:
             \r\t- Frequency: %0.3f rad/s\
             \r\t- Center Pressure: %0.1f mV\
             \r\t- Amplitude: %0.1f mV\
-            \r\t- Duration: %0.2f s\n", 
-            frq_rads, 
-            center_pressure, 
-            amplitude, 
-            duration);
+            \r\t- Duration: %0.2f s\n",
+                frq_rads,
+                center_pressure,
+                amplitude,
+                duration);
 
         fclose(notes_fptr);
         /*
@@ -1202,12 +1212,13 @@ public:
         uint64_t samples = 1;
         // iterate over each pair in the sequence, and hold a magnitude until the next event is reached
         data_fptr = fopen(data_fname.c_str(), "a");
-        while(time_span.count() < duration) {
+        while (time_span.count() < duration)
+        {
             m_commander->read_all();
             fprintf(data_fptr, "%s\n", m_commander->repr().c_str());
             now = std::chrono::high_resolution_clock::now();
             time_span = now - time_zero;
-            float mag_out = center_pressure+amplitude*sin(frq_rads*time_span.count());
+            float mag_out = center_pressure + amplitude * sin(frq_rads * time_span.count());
             m_commander->set_pressure_output((int)mag_out);
             if (verbose && time_span.count() > next_update)
             {
@@ -1217,6 +1228,134 @@ public:
             }
         }
         fclose(data_fptr);
+        m_commander->set_pressure_output(0);
+        printf("\n");
+        term_notes(notes_fname);
+        printf("- - TEST DONE - -\n");
+    }
+
+    void run_characterization_test(float lower_bound_percent, float upper_bound_percent, float step_size, string nickname, bool verbose, float update_frq)
+    {
+        /*
+            Step through a pressure lower bound to a pressure upper bound with the brakes locked, then depressurize,
+            go back. We operate in percentages
+
+            - Go to a floor value, wait until system is steady, lock the brakes, then proceed with ramping up pressures and recording values
+             - will hold at a pressure for 10 seconds before increasing the pressure again
+        */
+        m_latest_nickname = nickname;
+        printf("Notice: Dynamic Test <run_characterization_test> Selected\n");
+        FILE *data_fptr;
+        FILE *notes_fptr;
+        string data_fname, notes_fname;
+        get_fnames(data_fname, notes_fname, nickname);
+
+        //init counters
+        std::chrono::time_point<std::chrono::high_resolution_clock> time_zero, now, moving_timer;
+        time_zero = std::chrono::high_resolution_clock::now();
+        now = time_zero;
+        moving_timer = time_zero;
+        std::chrono::duration<double> time_span = now - time_zero; // general case
+        std::chrono::duration<double> short_time_span = now - time_zero; // general case
+        double start_time = time_span.count();
+        
+        //open and initialize files, reset the time on the system
+        printf("- - Test In Progress - -\n");
+        m_commander->m_reset_time();
+        data_fptr = fopen(data_fname.c_str(), "a");
+
+        fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
+        fclose(data_fptr);
+        init_notes(notes_fname);
+
+        notes_fptr = fopen(notes_fname.c_str(), "a");
+        fprintf(notes_fptr, "System Characterization Parameters:\
+            \r\t- Lower bound: %0.2f percent\
+            \r\t- Upper bound: %0.2f percent\
+            \r\t- Step size: %0.2f percent\n",
+                lower_bound_percent,
+                upper_bound_percent,
+                step_size);
+
+        fclose(notes_fptr);
+
+        //quickly go through and find out the number of tests we'll be conducting, and get the total amount of time for the test
+        //there is totally a formula for this
+        int n_tests = 0, n_tests_t = 0;
+        for (float _floor = lower_bound_percent; _floor <= upper_bound_percent; _floor += step_size) {
+            for (float _p_out = _floor; _p_out <= upper_bound_percent; _p_out += step_size) {
+                n_tests_t++;
+            }
+            n_tests++;
+        }
+
+        float lag_time = 5, relaxation_time = 3, hold_time = 5;
+        float total_test_time = hold_time*n_tests_t+(lag_time+relaxation_time)*n_tests;
+        float next_update = 0;
+        //outer loop for the floor pressure conditions
+        int test_i = 1;
+        m_commander->disable_brakes();
+        float eps = 3;//very small offset to zero the brakes
+        for (float floor = lower_bound_percent; floor <= upper_bound_percent; floor += step_size)
+        {
+            //TODO: Provide better updates
+            printf("Test %d/%d - %0.2f s / %0.2f s - [LB %0.2f, UB %0.2f]\t\t\t\t\t\n", test_i, n_tests, time_span.count(),total_test_time, floor, upper_bound_percent);
+            fflush(stdout);
+            //go to floor conditions - hold for 5 seconds
+            m_commander->set_pressure_output(floor+eps);
+            short_time_span = now - time_zero;
+            while ((time_span.count()) < short_time_span.count()+lag_time)
+            {
+                printf("Resetting to Floor Conditions: %0.2f s / %0.2f s\t\t\t\t\r", time_span.count(), short_time_span.count()+lag_time);
+                now = std::chrono::high_resolution_clock::now();
+                time_span = now - time_zero;
+                fflush(stdout);
+            }
+            //lock the brakes
+            m_commander->enable_brakes();
+            //start writing data
+            data_fptr = fopen(data_fname.c_str(), "a");
+            //from the current floor value, to the general maximum pressure, increase incrementally and hold at each increment to the upper bound for 5 seconds
+            for (float p_out = floor; p_out <= upper_bound_percent; p_out += step_size)
+            {
+                //hold for hold time and capture data
+                short_time_span = now - time_zero;
+                m_commander->set_pressure_output(p_out);
+                while ((time_span.count()) < short_time_span.count()+hold_time)
+                {
+                    //TODO: Add verbose mode/checking while sampling
+                    //printf("Resetting to Floor Conditions: %0.2f s / %0.2f s\r", time_span.count(), short_time_span.count()+hold_time);
+                    if (verbose && time_span.count() > next_update)
+                    {
+                        printf("%0.2f s / %0.2f s \t\t\t\t \r", time_span.count(), total_test_time);
+                        fflush(stdout);
+                        next_update = time_span.count() + update_frq;
+                    }
+                    m_commander->read_all();
+                    fprintf(data_fptr, "%s\n", m_commander->repr().c_str());
+                    now = std::chrono::high_resolution_clock::now();
+                    time_span = now - time_zero;
+                }
+            }
+            fclose(data_fptr);
+            //relax to 20% less than the floor value pressure, disable the brakes
+            m_commander->set_pressure_output(floor*0.8);
+            short_time_span = now - time_zero;
+            while ((time_span.count()) < short_time_span.count()+relaxation_time)
+            {
+                if(test_i == n_tests_t-1) {
+                    printf("Concluding test: %0.2f s / %0.2f s\r", time_span.count(), short_time_span.count()+relaxation_time);
+                } else {
+                    printf("Relaxing and moving onto next test: %0.2f s / %0.2f s\r", time_span.count(), short_time_span.count()+relaxation_time);
+                }
+                
+                now = std::chrono::high_resolution_clock::now();
+                time_span = now - time_zero;
+            }
+            test_i++;
+            m_commander->disable_brakes();
+        }
+
         m_commander->set_pressure_output(0);
         printf("\n");
         term_notes(notes_fname);

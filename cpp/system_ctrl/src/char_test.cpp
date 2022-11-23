@@ -1,7 +1,7 @@
 /**
- * @file ramp_test.cpp
+ * @file char_test.cpp
  * @author Raymond Turrisi <rturrisi (at) mit (dot) edu>
- * @brief Demonstration of ramp input tests
+ * @brief Demonstration of characterization test
  * @version 0.1
  * @date 2022-11-19
  * 
@@ -48,13 +48,6 @@ int main(int ac, char* av[]) {
     //instantiate a dynamic test
     DynamicTest dyn_test(commander);
     //can modify default parameters - verbose is by default off, and the update frequency if you enable verbose
-    bool verbose = true; // whether or not you want to be updated during the test - not advised for high performance sampling
-    float update_frq = 0.5; // frequency which you want to receive updates - the more printouts you receive per second the greater you comprimise performance
-    float center_pressure = 50; //mV
-    float amplitude = 50; //mV
-    float desired_frq_hz = 3;
-    float frq_rads = 2*3.14*desired_frq_hz;
-    float duration = 30;
-    dyn_test.run_frq_response(center_pressure, amplitude, frq_rads, duration, "frq", verbose, update_frq);
+    dyn_test.run_characterization_test(0, 100, 10, "characterization", true, 1);
     return 0;
 }
