@@ -488,9 +488,9 @@ public:
         read_piezo_pressure();
         read_position_sensor();
         read_load_cell();
-        // industrial_dual_0_20ma_v2_set_sample_rate(&m_pressure_sensors, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
-        // industrial_dual_0_20ma_v2_set_sample_rate(&m_position_sensor, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
-        // load_cell_v2_set_configuration(&m_load_cell, 0, 0);
+        industrial_dual_0_20ma_v2_set_sample_rate(&m_pressure_sensors, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
+        industrial_dual_0_20ma_v2_set_sample_rate(&m_position_sensor, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
+        load_cell_v2_set_configuration(&m_load_cell, 0, 0);
         return;
     }
 
@@ -890,6 +890,7 @@ public:
         fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
+        fprintf(notes_fptr, "Step response parameters:\n");
         fprintf(notes_fptr, "Sequence: \n\t-%s", step_sequence.repr("\n\t-").c_str());
         fclose(notes_fptr);
         /*
@@ -1024,6 +1025,7 @@ public:
         fclose(data_fptr);
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
+        fprintf(notes_fptr, "Ramp response parameters:\n");
         fprintf(notes_fptr, "Sequence: \n\t-%s", ramp_sequence.repr("\n\t-").c_str());
         fclose(notes_fptr);
         /*
@@ -1189,8 +1191,8 @@ public:
         notes_fptr = fopen(notes_fname.c_str(), "a");
         fprintf(notes_fptr, "Frequency response parameters:\
             \r\t- Frequency: %0.3f rad/s\
-            \r\t- Center Pressure: %0.1f mV\
-            \r\t- Amplitude: %0.1f mV\
+            \r\t- Center Pressure: %0.1f percent\
+            \r\t- Amplitude: %0.1f percent\
             \r\t- Duration: %0.2f s\n",
                 frq_rads,
                 center_pressure,
