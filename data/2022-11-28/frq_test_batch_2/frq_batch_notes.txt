@@ -1,0 +1,22 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi      
+Date: Mon Nov 28 18:00 2022        
+User Notes:        
+	After fixing the sampling frequency reset, this is a set of data 
+	to measure the frequency response of the system for increasing
+	frequencies. The frequency in radians per second is included in 
+	all file names. This batch is at the center pressure, and 0.5 bar 
+	(8.3% output) pressure amplitude oscillations. Each test runs for 
+	20 seconds.
+        
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+Frequency response parameters:            
+	- Center Pressure: 50.0 percent            
+	- Amplitude: 8.333 percent            
+	- Duration: 20.00 s
+
+**********************************************************************|

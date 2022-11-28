@@ -1,0 +1,23 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi      
+Nickname: frq_test_rads-1,57        
+Date: Mon Nov 28 17:32:23 2022        
+User Notes:        
+	After fixing the sampling frequency reset, this is a set of data 
+	to measure the frequency response of the system for increasing
+	frequencies. The frequency in radians per second is included in 
+	all file names. 
+        
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+Frequency response parameters:            
+	- Frequency: 1.570 rad/s            
+	- Center Pressure: 50.0 percent            
+	- Amplitude: 50.0 percent            
+	- Duration: 20.00 s
+
+
+**********************************************************************|

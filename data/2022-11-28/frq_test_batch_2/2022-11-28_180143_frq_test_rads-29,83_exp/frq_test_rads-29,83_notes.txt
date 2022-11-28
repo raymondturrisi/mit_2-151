@@ -1,0 +1,11 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        Test Conducted by: <NAME>        Nickname: frq_test_rads-29,83        Date: Mon Nov 28 18:02:00 2022        User Notes:        
+        
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+Frequency response parameters:            	- Frequency: 29.830 rad/s            	- Center Pressure: 50.0 percent            	- Amplitude: 8.3 percent            	- Duration: 20.00 s
+
+
+**********************************************************************|
