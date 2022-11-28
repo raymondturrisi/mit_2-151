@@ -7,6 +7,11 @@
 #ignore .mat files - these are considered temporary unless you manually add them
 *.mat
 
+#ignore ipynb checkpoints
+
+*.ipynb_checkpoints*
+*checkpoint.ipynb
+
 #ignore all executables
 *.exe
 
