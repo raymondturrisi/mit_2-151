@@ -6,42 +6,41 @@ import os, sys
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.signal import find_peaks
-import seaborn as sns
 
 if len(sys.argv) != 2:
-    print("Useage: \n\t$python3 peak.py data/data_day/data_dir")
+    print("Useage: \n\t$python3 peek.py data/data_day/data_dir")
     exit(1)
 
 
 def plot_test(df):
-    fig, axes = plt.subplots(4,1, sharex=True, figsize=(10,10))
+    fig, axes = plt.subplots(5,1, sharex=True, figsize=(15,10))
     axes[0].plot(df["t"], df["y"],linestyle='None',marker='o',markersize=1)
     axes[0].plot(0, 0,linestyle='None',marker='o',markersize=1, color='r')
     axes[0].grid()
     axes[0].set_ylabel("Distance (mm)")
-    shared_x_load = axes[0].twinx()
-    shared_x_load.plot(df["t"], df["l"],linestyle='None',marker='o',markersize=1,color='r')
-    shared_x_load.set_ylabel("Load (grams)")
-    axes[0].legend(["Vertical Distance", "Load"],loc='upper right')
-    axes[1].plot(df["t"], df["p_o"],linestyle='None',marker='o',markersize=1)
-    axes[1].grid()
-    axes[1].plot(df["t"], df["p_p"],linestyle='None',marker='o',markersize=1)
-    axes[1].set_ylabel("Pressure - Actuator \n(Bar)")
-    axes[1].set_ylim([-0.25, 6.25])
-    axes[1].legend(["Pressure Out","Pressure Gauge"])
-    axes[2].plot(df["t"], df["p_c"],linestyle='None',marker='o',markersize=1)
-    axes[2].grid()
-    axes[2].set_ylim([-0.25, 6.25])
-    axes[2].set_ylabel("Pressure - Comp. \n(Bar)")
 
-    axes[3].plot(df["t"], df["v"],linestyle='None',marker='o',markersize=1)
+    axes[1].plot(df["t"], df["l"],linestyle='None',marker='o',markersize=1,color='r')
+    axes[1].grid()
+    axes[1].set_ylabel("Load (grams)")
+    
+    axes[2].plot(df["t"], df["p_o"],linestyle='None',marker='o',markersize=1)
+    axes[2].grid()
+    axes[2].plot(df["t"], df["p_p"],linestyle='None',marker='o',markersize=1)
+    axes[2].set_ylabel("Pressure - Actuator \n(Bar)")
+    #axes[2].set_ylim([-0.25, 6.25])
+
+    axes[2].legend(["Pressure Out","Pressure Gauge"])
+
+    axes[3].plot(df["t"], df["p_c"],linestyle='None',marker='o',markersize=1)
     axes[3].grid()
-    axes[3].set_ylabel("System (V)")
+    #axes[2].set_ylim([-0.25, 6.25])
+    axes[3].set_ylabel("Pressure - Comp. \n(Bar)")
+
+    axes[4].plot(df["t"], df["v"],linestyle='None',marker='o',markersize=1)
+    axes[4].grid()
+    axes[4].set_ylabel("System (V)")
     plt.suptitle("Experiment")
     plt.show()
-
-
 
 
 data = []

@@ -1,0 +1,19 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi     
+Nickname: step        
+Date: Mon Nov 28 19:14:11 2022        
+User Notes:        
+    Step with sandbag - relaxation
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+Step response parameters:
+Sequence: 
+	-[0.00, 50]
+	-[10.00, 40]
+	-[15.00, 50]
+	-[20.00, 0]
+
+**********************************************************************|

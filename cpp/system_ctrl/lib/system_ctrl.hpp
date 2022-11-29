@@ -763,21 +763,21 @@ public:
         std::chrono::time_point<std::chrono::high_resolution_clock> now = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> time_span = now - time_zero;
         float transition_time = 5;                // 5 seconds to reach equilibrium
-        int lb = 0, ub = sequence.m_magnitude[0]; // go from resting, to the initial condition
-        int steps = 40;                           // smooth the transition to initial conditions - break into 40 steps
+        float lb = 0, ub = sequence.m_magnitude[0]; // go from resting, to the initial condition
+        float steps = 40;                           // smooth the transition to initial conditions - break into 40 steps
         int action_span = transition_time * 1000; // ms
-        int time_interval = action_span / steps;  // time between inputs - this is for a smooth transition rather than rapid inflation
+        float time_interval = action_span / steps;  // time between inputs - this is for a smooth transition rather than rapid inflation
         float increments = (ub - lb) / steps;     // the increments in which you will go from 0 to the initial condition
         int wait_time = 1000;                     // time to wait after you arrive at the destination
 
         // Go to initial conditions
         printf("- - Going to Initial Conditions - -\n");
-        for (int i = lb; i < ub; i += (int)increments)
+        for (float i = lb; i < ub; i += (float)increments)
         {
             now = std::chrono::high_resolution_clock::now();
             time_span = now - time_zero;
             m_commander->set_pressure_output(i);
-            this_thread::sleep_for(chrono::milliseconds(time_interval));
+            this_thread::sleep_for(chrono::milliseconds((int)time_interval));
             printf("%0.2f s / %0.2f s - -\r", time_span.count(), transition_time);
             fflush(stdout);
         }
@@ -888,6 +888,7 @@ public:
         data_fptr = fopen(data_fname.c_str(), "a");
 
         fprintf(data_fptr, "%s\n", m_commander->header(",").c_str());
+        fclose(data_fptr);
         init_notes(notes_fname);
         notes_fptr = fopen(notes_fname.c_str(), "a");
         fprintf(notes_fptr, "Step response parameters:\n");
