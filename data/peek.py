@@ -55,6 +55,7 @@ for file in files:
         print(file)
 dat = pd.read_csv(fname)
 dat["t"] = dat["T_(ms)"]/1000 #ms to s
+#dat["y"] = (dat["V_dist_(mA)"]-4.0)*125/16+25 #convert milliamp to millimeters
 #dat["y"] = 90.08745-((dat["V_dist_(mA)"]-4)/16)*101.60 #convert milliamp to millimeters
 dat["y"] = (dat["V_dist_(mA)"]*(-100.0/16.0)+125-11.2625) #convert milliamp to millimeters
 dat["strain"] = (init_length-dat["y"])/init_length
