@@ -11,6 +11,12 @@ foldernames = {'..\data\2022-11-28\2022-11-28_190714_step_exp';
     '..\data\2022-11-28\2022-11-28_191356_step_exp';
     '..\data\2022-11-28\2022-11-28_191555_step_exp'};
 
+%for portability - windows is agnostic to file separators - mac is not
+for k=1:size(foldernames)
+    foldernames{k} = strrep(foldernames{k}, "\", filesep);
+end
+
+
 
 %simscape parameters
 L_muscle = 30; %cm
