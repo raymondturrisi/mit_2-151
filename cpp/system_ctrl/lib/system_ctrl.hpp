@@ -245,6 +245,7 @@ public:
             // sets the configuration to sample at 80 Hz
             // load_cell_v2_set_configuration(&m_load_cell, 1, 0);
             load_cell_v2_set_configuration(&m_load_cell, 0, 0);
+            load_cell_v2_set_moving_average(&m_load_cell, 1);
             if ((last_err = load_cell_v2_get_weight(&m_load_cell, &m_weight_grams_dto)) < 0)
             {
                 fprintf(stderr, "ERR [%d]: Could not connect to load cell\n", last_err);
@@ -491,6 +492,8 @@ public:
         industrial_dual_0_20ma_v2_set_sample_rate(&m_pressure_sensors, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
         industrial_dual_0_20ma_v2_set_sample_rate(&m_position_sensor, INDUSTRIAL_DUAL_0_20MA_V2_SAMPLE_RATE_240_SPS);
         load_cell_v2_set_configuration(&m_load_cell, 0, 0);
+        load_cell_v2_set_moving_average(&m_load_cell, 1);
+
         return;
     }
 
