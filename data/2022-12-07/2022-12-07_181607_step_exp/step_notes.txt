@@ -1,0 +1,19 @@
+**********************************************************************|
+NOTES FILE FOR TEST
+        
+Test Conducted by: Raymond Turrisi   
+Nickname: step        
+Date: Wed Dec  7 18:16:22 2022        
+User Notes:        
+    Contraction step response
+        
+----------------------------------------------------------------------|
+SYSTEM OUTPUT
+Step response parameters:
+Sequence: 
+	-[0.00, 50]
+	-[10.00, 75]
+	-[15.00, 50]
+	-[20.00, 0]
+
+**********************************************************************|
