@@ -7,7 +7,6 @@ L_0 = L_a + L_a*e;
 P_g0 = 300000; 
 
 %Correction Factor - Kang
-syms L_s P_gs
 C_q1 = 3; %unitless, referencing kang's paper for ballpark region estimate
 C_q2 = -0.000002; %unitless
 q = @(P) 1 + C_q1 .* exp(C_q2.*P); %q correction factor

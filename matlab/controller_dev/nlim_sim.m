@@ -13,16 +13,21 @@ function dx = nlim_sim(t,x,sys_consts)
         - F = ()
 
 %}
-
-
+global sys_consts
+atm = 101280; %pascals
 Pg = x(1);
 dL = x(2);
 L_dot = x(3);
 
+tau = sys_consts.tau;
+b = sys_consts.b;
+m = sys_consts.m;
+u = sys_consts.u(t);
+r = sys_consts.r(u);
+
 P_gs = sys_consts.p_eq+Pg;
 g = 9.81;
 q = sys_consts.q;
-eps = sys_consts.eps;
 C_1 = sys_consts.C_1;
 C_2 = sys_consts.C_2;
 C_3 = sys_consts.C_3;
@@ -31,18 +36,22 @@ C_5 = sys_consts.C_5;
 C_q1 = sys_consts.C_q1;
 C_q2 = sys_consts.C_q2;
 
-syms L_s
-nlin_model_sim = [(P_gs.*C_4.*(1+(q(P_gs).^2).*(eps(L_s).^2) - 2.*q(P_gs).*eps(L_s)) - P_gs.*C_5) == g*sys_consts.m];
+%nlin_model_sim = [(P_gs.*C_4.*(1+(q(P_gs).^2).*(eps(L_s).^2) - 2.*q(P_gs).*eps(L_s)) - P_gs.*C_5) == g*sys_consts.m];
+D_0 = 0.010;
+alpha_0 = 23*pi/180;
+C = 1-((4*m*g/(pi*(P_gs+atm)*D_0^2) + 1/(sin(alpha_0)^2)))*(tan(alpha_0)^2)/3;
+eps = [(1-sqrt(4*q(P_gs+atm)-4*C)/2), (1+sqrt(4*q(P_gs+atm)-4*C)/2)];
+L_f = -((eps*sys_consts.L_a)-sys_consts.L_a);
+L_f = max(L_f)*(sys_consts.L_a/0.4447);
 
 %Calculate free length of system when suspending just the mass at a
 %pressure
-L_f = double(max(solve(nlin_model_sim)));
 
 %Find what the force applied can be at a length and a pressure
-f_0 = sys_consts.nlin_model(Pg, L_f);
-disp(f_0)
+f_0 = sys_consts.nlin_model(P_gs, L_f);
+
 %Compute the stiffness from deviating about this equlibrium point
-k = f_0/L_f;
+k = 5000;
 
 %For convention we are working about a linearized point, so we have the
 %free length, minus the linearized point plus the deviation from this
@@ -50,16 +59,11 @@ k = f_0/L_f;
 %total simulated length. 
 dL_nl = (L_f-(sys_consts.l_0+dL));
 f_k = k*dL_nl;
-tau = sys_consts.tau;
-b = sys_consts.b;
-m = sys_consts.m;
-u = sys_consts.u(t);
-r = sys_consts.r(u);
 
 Pg_dot = -Pg/tau + r/tau;
 strain = 1-(sys_consts.L_a + dL)/sys_consts.L_a;
 
-L_dotdot = (L_dot*b/m+g-f_k/m);
+L_dotdot = (-L_dot*b/m-g+f_k/m);
 
 sys_consts.steps = sys_consts.steps+1;
 
@@ -70,5 +74,6 @@ dx = ...
     L_dotdot
     ];
 
+sys_consts.states = [sys_consts.states;[t dx']];
 end
 

@@ -84,7 +84,7 @@ for i = 1:length(data)
     fig_name = sprintf("CL %d", i);
     %Extract the experimental parameters
     t_sim = linspace(0, 20, 100*20);
-    y_ss = -0.030;
+    y_ss = -0.020;
     %u_sim = [zeros(1,floor(length(t_sim)/3)), ones(1,ceil(length(t_sim)/3)),zeros(1,ceil(length(t_sim)/3))];​
     %u_sim = [1./(1+exp(-10*t_sim(find(t_sim <= 6)))), ones(1,length(t_sim(find((t_sim > 6) & (t_sim <= 14))))),1./(1+exp(t_sim(find((t_sim) > 14))))];
     step_func = @(t) 1./(1+exp(-50*(t-6))).*1./(1+exp(50*(t-14)));
@@ -137,6 +137,8 @@ for i = 1:length(data)
 
     r_func = @(u) u*u2r*y_ss;
     step_func = @(t) 1./(1+exp(-50*(t-6))).*1./(1+exp(50*(t-14)));
+    clear sys_consts
+    global sys_consts
     sys_consts.u = step_func;
     sys_consts.r = r_func;
     sys_consts.t = t_sim;
@@ -159,11 +161,13 @@ for i = 1:length(data)
     sys_consts.steps = 0;
     sys_consts.last_update = 0;
     sys_consts.updates_every = 1;
-
-
+    sys_consts.states = [0 0 0 0];
+    
+    sys_consts.states
+    sys_consts.states
     %options = odeset('RelTol',1e-8,'AbsTol',1e-8);
 
-    [t_nlin, y_nlin] = ode23(@(t,y) nlim_sim(t,y,sys_consts), t_sim, x_0);
+    [t_nlin, y_nlin] = ode45(@(t,y) nlim_sim(t,y,sys_consts), t_sim, x_0);
     
     %Set a random seed so its repeatable - initialize observer to random
     %values
@@ -184,7 +188,7 @@ for i = 1:length(data)
     f_cl_sim = (lin_model(X_cl(:,1), Y_cl))+mass*9.81;
     f_w_obsv_s_sim = (lin_model(X_w_obsv(:,1), Y_w_obsv))+mass*9.81;
     f_w_obsv_o_sim = (lin_model(X_w_obsv(:,4), Y_w_obsv))+mass*9.81;
-    f_nlin_sim = nlin_model(y_nlin(:,1), L_a+y_nlin(:,2))+mass*9.81;
+    f_nlin_sim = -mass*(sys_consts.states(:,4))+mass*9.81;
 
     %Open figure for comparing sims
     figure("Name", fig_name, "Position",[0+k*xdiff,400-k*ydiff,800,600])
@@ -195,6 +199,7 @@ for i = 1:length(data)
     %Estimated reference pressure
     plot(t_sim, r/bar2Pa, "r-")
     hold on
+
     %Internal gauge pressures for each simulation
     plot(t_sim, X_cl(:,1)/bar2Pa, "g--")
     plot(t_sim, X_w_obsv(:,1)/bar2Pa, "b:")
@@ -210,22 +215,23 @@ for i = 1:length(data)
     %target
     plot(t_sim, f_cl_sim, "g--")
     hold on
+
     %closed loop
     plot(t_sim, f_w_obsv_s_sim, "b:")
     plot(t_sim, f_w_obsv_o_sim, "mo", markersize=1)
-    plot(t_nlin, f_nlin_sim, "kx", markersize=1)
-
+    plot(sys_consts.states(:,1), f_nlin_sim, "kx", markersize=1)
+    
     subtitle("Force")
     legend(["Closed Loop", "Full System - State", "Full System - Observer", "Nonlinear Model"])
     ylabel("Newtons")
     xlabel("Time (s)")
 
     subplot(3,1,3)
-    plot(t_sim, y_ss*1000, "r-")
+    plot(t_sim, -y_ss*1000, "r-")
     hold on
-    plot(t_sim, Y_cl*1000, "g--")
-    plot(t_sim, Y_w_obsv*1000, "mo", markersize=1)
-    plot(t_nlin, y_nlin(:,2)*1000, "kx", markersize=1)
+    plot(t_sim, -Y_cl*1000, "g--")
+    plot(t_sim, -Y_w_obsv*1000, "mo", markersize=1)
+    plot(t_nlin, -y_nlin(:,2)*1000, "kx", markersize=1)
 
     subtitle("Displacement")
     legend(["Input", "Closed Loop", "Observer", "Full System", "Nonlinear Model"])
