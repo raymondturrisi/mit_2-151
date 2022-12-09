@@ -7,10 +7,11 @@ L_0 = L_a + L_a*e;
 P_g0 = 300000; 
 
 %Correction Factor - Kang
+syms L_s P_gs
 C_q1 = 3; %unitless, referencing kang's paper for ballpark region estimate
 C_q2 = -0.000002; %unitless
-q = @(P) 1 + C_q1 * exp(C_q2*P); %q correction factor
-eps = @(L) (L_a - L)/(L_a); %strain
+q = @(P) 1 + C_q1 .* exp(C_q2.*P); %q correction factor
+eps = @(L) (L_a - L)./(L_a); %strain
 alpha_0 = 23*pi/180; %braid angle, degrees to radians
 D_0 = 0.010; %meters
 C_1 = (pi*D_0^2)/(4.0);
@@ -20,7 +21,7 @@ C_4 = C_1*C_2;
 C_5 = C_1*C_3;
 
 %Non-linear theoretical force
-nlin_model = @(P,L) P*C_4*(1+(q(P)^2)*(eps(L)^2) - 2*q(P)*eps(L)) - P*C_5;
+nlin_model = @(P,L) (P.*C_4.*(1+(q(P).^2).*(eps(L).^2) - 2.*q(P).*eps(L)) - P.*C_5);
 
 f_0 = nlin_model(300000, L_0);
 
@@ -34,7 +35,7 @@ lin_model = @(dP, dL) Q_1*(dP)+Q_2*(dL);
 F_lin = f_0+lin_model(0,0);
 
 
-delta_P = 1; %from center point
+delta_P = 10000; %from center point
 delta_s = 0.01; %strain from center point
 delta_L = L_a*(delta_s - e);
 
@@ -57,7 +58,7 @@ C = [0 1 0];
 D = [0];
 
 sys = ss(A,B,C,D);
-poles = [-17+17j,-17-17j,-10.5]
+poles = [-17+17j,-17-17j,-10.5];
 K = place(A, B, poles);
 
 A_cl = A-B*K;

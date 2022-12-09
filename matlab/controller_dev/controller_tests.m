@@ -13,6 +13,7 @@ bar2Pa = 100000;
 %Analyze open loop data
 k = 1;
 
+%{
 for i = 1:length(data)
     fig_name = sprintf("OL %d", i);
     %Extract the experimental parameters
@@ -76,16 +77,20 @@ for i = 1:length(data)
 
     k=k+1;
 end
-
+%}
 
 %Analyze closed loop hypothetical data
 for i = 1:length(data)
     fig_name = sprintf("CL %d", i);
     %Extract the experimental parameters
     t_sim = linspace(0, 20, 100*20);
-    y_ss = -0.010;
-    u_sim = [zeros(1,floor(length(t_sim)/3)), ones(1,ceil(length(t_sim)/3)),zeros(1,ceil(length(t_sim)/3))];
-    
+    y_ss = -0.030;
+    %u_sim = [zeros(1,floor(length(t_sim)/3)), ones(1,ceil(length(t_sim)/3)),zeros(1,ceil(length(t_sim)/3))];​
+    %u_sim = [1./(1+exp(-10*t_sim(find(t_sim <= 6)))), ones(1,length(t_sim(find((t_sim > 6) & (t_sim <= 14))))),1./(1+exp(t_sim(find((t_sim) > 14))))];
+    step_func = @(t) 1./(1+exp(-50*(t-6))).*1./(1+exp(50*(t-14)));
+    u_sim=step_func(t_sim);
+    %u_sim=1./(1+exp(-1*(t_sim)));
+
     %Get new state space equations about an operating point/start of the
     %experiment
     p_g0 = 200000;
@@ -93,7 +98,6 @@ for i = 1:length(data)
     l_0 = L_a+L_a*(-0.1);
     f_0 = nlin_model(p_g0, l_0);
   
-
     [A,B,C,D] = get_model(p_g0, l_0, 6);
     
     %Place the poles
@@ -130,14 +134,45 @@ for i = 1:length(data)
 
     [Y_cl,T_cl,X_cl] = lsim(sys_cl, r, t_sim, x_0);
     [Y_obsv,T_obsv,X_obsv] = lsim(sys_obsv, r, t_sim, x_0);
+
+    r_func = @(u) u*u2r*y_ss;
+    step_func = @(t) 1./(1+exp(-50*(t-6))).*1./(1+exp(50*(t-14)));
+    sys_consts.u = step_func;
+    sys_consts.r = r_func;
+    sys_consts.t = t_sim;
+    sys_consts.nlin_model = nlin_model;
+    sys_consts.q = q;
+    sys_consts.eps = eps;
+    sys_consts.b = b;
+    sys_consts.m = mass;
+    sys_consts.tau = tau;
+    sys_consts.L_a = L_a;
+    sys_consts.l_0 = l_0;
+    sys_consts.p_eq = p_g0;
+    sys_consts.C_1 = C_1;
+    sys_consts.C_2 = C_2;
+    sys_consts.C_3 = C_3;
+    sys_consts.C_4 = C_4;
+    sys_consts.C_5 = C_5;
+    sys_consts.C_q1 = C_q1;
+    sys_consts.C_q2 = C_q2;
+    sys_consts.steps = 0;
+    sys_consts.last_update = 0;
+    sys_consts.updates_every = 1;
+
+
+    %options = odeset('RelTol',1e-8,'AbsTol',1e-8);
+
+    [t_nlin, y_nlin] = ode23(@(t,y) nlim_sim(t,y,sys_consts), t_sim, x_0);
+    
     %Set a random seed so its repeatable - initialize observer to random
     %values
     rng(1)
-    x_0 = [0, 0, 0, 100000*rand, 0, 0.01*rand];
+    x_0 = [0, 0, 0, rand, 0, 0.01*rand];
     [Y_w_obsv,T_w_obsv,X_w_obsv] = lsim(sys_w_obsv, r, t_sim, x_0);
     
     %- - SYSTEMS SIMULATED - -
-    pg_sim = X(:,1);
+    %pg_sim = X(:,1);
     l_cl_sim = Y_cl*1000;
     l_obsv_sim = Y_obsv*1000;
     l_w_obsv_sim = Y_w_obsv*1000;
@@ -149,6 +184,7 @@ for i = 1:length(data)
     f_cl_sim = (lin_model(X_cl(:,1), Y_cl))+mass*9.81;
     f_w_obsv_s_sim = (lin_model(X_w_obsv(:,1), Y_w_obsv))+mass*9.81;
     f_w_obsv_o_sim = (lin_model(X_w_obsv(:,4), Y_w_obsv))+mass*9.81;
+    f_nlin_sim = nlin_model(y_nlin(:,1), L_a+y_nlin(:,2))+mass*9.81;
 
     %Open figure for comparing sims
     figure("Name", fig_name, "Position",[0+k*xdiff,400-k*ydiff,800,600])
@@ -163,12 +199,12 @@ for i = 1:length(data)
     plot(t_sim, X_cl(:,1)/bar2Pa, "g--")
     plot(t_sim, X_w_obsv(:,1)/bar2Pa, "b:")
     plot(t_sim, X_w_obsv(:,4)/bar2Pa, "mo", markersize=1)
-    
+    plot(t_nlin, y_nlin(:,1)/bar2Pa, "kx", markersize=1)
     subtitle("Pressures")
-    legend(["Input", "Closed Loop", "Full System - State", "Full System - Observer"])
+    legend(["Input", "Closed Loop", "Full System - State", "Full System - Observer", "Nonlinear Model"])
     ylabel("Bar")
     xlabel("Time (s)")
-
+    
     subplot(3,1,2)
     %plot displacements
     %target
@@ -177,9 +213,10 @@ for i = 1:length(data)
     %closed loop
     plot(t_sim, f_w_obsv_s_sim, "b:")
     plot(t_sim, f_w_obsv_o_sim, "mo", markersize=1)
+    plot(t_nlin, f_nlin_sim, "kx", markersize=1)
 
     subtitle("Force")
-    legend(["Closed Loop", "Full System - State", "Full System - Observer"])
+    legend(["Closed Loop", "Full System - State", "Full System - Observer", "Nonlinear Model"])
     ylabel("Newtons")
     xlabel("Time (s)")
 
@@ -188,11 +225,12 @@ for i = 1:length(data)
     hold on
     plot(t_sim, Y_cl*1000, "g--")
     plot(t_sim, Y_w_obsv*1000, "mo", markersize=1)
+    plot(t_nlin, y_nlin(:,2)*1000, "kx", markersize=1)
 
     subtitle("Displacement")
-    legend(["Input", "Closed Loop", "Observer", "Full System"])
+    legend(["Input", "Closed Loop", "Observer", "Full System", "Nonlinear Model"])
     ylabel("mm")
     xlabel("Time (s)")
-    
     k=k+1;
+    break;
 end

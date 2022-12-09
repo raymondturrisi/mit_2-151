@@ -23,6 +23,6 @@ function lin_model = get_lin_model(p_0, L_0)
     Q_1=Q1p1+(Q1p2 + Q1p3)*Q1pend;
     Q_2 = (2*P_g0*C_4)/(L_a) + ((2*P_g0*C_4*C_q1)/(L_a))*exp(C_q2*P_g0)+(P_g0*C_4+P_g0*C_4*(C_q1^2)*exp(2*C_q2*P_g0) + 2*P_g0*C_4*C_q1*exp(C_q2*P_g0))*((2*L_0)/(L_a^2) - 2/L_a);
 
-    lin_model = @(dP, dL) Q_1*(dP)+Q_2*(dL);
+    lin_model = @(dP, dL) (Q_1*(dP)+Q_2*(dL));
 end
 
