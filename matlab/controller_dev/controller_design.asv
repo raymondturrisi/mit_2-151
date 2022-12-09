@@ -1,0 +1,137 @@
+clear;clc;close all;
+
+%linearization points
+e = -0.032256; %linearize at -10% strain
+L_a = 0.3; %length of actuator
+L_0 = L_a + L_a*e;
+P_g0 = 300000; 
+
+%Correction Factor - Kang
+C_q1 = 3; %unitless, referencing kang's paper for ballpark region estimate
+C_q2 = -0.000002; %unitless
+q = @(P) 1 + C_q1 * exp(C_q2*P); %q correction factor
+eps = @(L) (L_a - L)/(L_a); %strain
+alpha_0 = 23*pi/180; %braid angle, degrees to radians
+D_0 = 0.010; %meters
+C_1 = (pi*D_0^2)/(4.0);
+C_2 = (3)/(tan(alpha_0)^2);
+C_3 = (1)/(sin(alpha_0)^2);
+C_4 = C_1*C_2;
+C_5 = C_1*C_3;
+
+%Non-linear theoretical force
+nlin_model = @(P,L) P*C_4*(1+(q(P)^2)*(eps(L)^2) - 2*q(P)*eps(L)) - P*C_5;
+
+f_0 = nlin_model(300000, L_0);
+
+Q1p1 = C_4-C_5-2*C_4*((L_a-L_0)/L_a)-2*C_4*((L_a-L_0)/(L_a))*C_q1*(exp(C_q2*P_g0)+(P_g0)*C_q2*exp(C_q2*P_g0));
+Q1p2 = C_4+C_4*(C_q1^2)*(exp(2*C_q2*P_g0)+2*(P_g0)*C_q2*exp(2*C_q2*P_g0));
+Q1p3 = 2*C_4*C_q1*(exp(C_q2*P_g0)+(P_g0)*C_q2*exp(C_q2*P_g0));
+Q1pend = ((L_a^2 + L_0^2 - 2*L_0*L_a)/(L_a^2));
+Q_1=Q1p1+(Q1p2 + Q1p3)*Q1pend;
+Q_2 = (2*P_g0*C_4)/(L_a) + ((2*P_g0*C_4*C_q1)/(L_a))*exp(C_q2*P_g0)+(P_g0*C_4+P_g0*C_4*(C_q1^2)*exp(2*C_q2*P_g0) + 2*P_g0*C_4*C_q1*exp(C_q2*P_g0))*((2*L_0)/(L_a^2) - 2/L_a);
+lin_model = @(dP, dL) Q_1*(dP)+Q_2*(dL);
+F_lin = f_0+lin_model(0,0);
+
+
+delta_P = 1; %from center point
+delta_s = 0.01; %strain from center point
+delta_L = L_a*(delta_s - e);
+
+nlin_force_2 = nlin_model(P_g0+delta_P, L_a+delta_s*L_a);
+lin_force_2 = f_0+lin_model(delta_P, delta_L);
+
+C1 = Q_1;
+C2 = Q_2;
+tau = 0.1;
+mass = 6;
+zeta = 0.5;
+k = 0;
+b = 2*zeta*sqrt((k+C2)*mass); %arbitrary damping
+A = ...
+    [-1/tau 0 0;
+    0 0 1;
+    -C1/mass -(C2+k)/mass -b/mass];
+B = [1/tau 0 0]';
+C = [0 1 0];
+D = [0];
+
+sys = ss(A,B,C,D);
+poles = [-17+17j,-17-17j,-10.5]
+K = place(A, B, poles);
+
+A_cl = A-B*K;
+
+sys_cl = ss(A_cl,B,C,D);
+
+
+L = place(A',C',3*poles);
+A_obsv = (A-L'*C);
+sys_obsv = ss(A_obsv, B, C, D);
+
+A_w_obsv = [A -B*K;L'*C (A-B*K-L'*C)];
+B_w_obsv = [B;B];
+C_w_obsv = [C zeros(1,3)];
+sys_w_obsv = ss(A_w_obsv, B_w_obsv, C_w_obsv, D);
+
+pz_msize = 10;
+pz_lw = 3;
+
+fbg_d = 255;
+fbg_p = 250;
+
+figure('Name', "PZ Maps for Open Loop and Closed Loop System")
+set(gcf, 'color', [fbg_p, fbg_p, fbg_d]/255);
+pz = subplot(4,1,1);
+a1 = pz;
+pzmap(sys)
+pzh = findobj(pz, 'Type', 'Line');
+pzh(2).MarkerSize = pz_msize;
+pzh(2).LineWidth = pz_lw;
+pzh(2).Color = 'g';
+pzh(3).MarkerSize = pz_msize;
+pzh(3).LineWidth = pz_lw;
+pzh(3).Color = 'r';
+title("PZ Map - Open Loop System");
+grid on
+
+pz = subplot(4,1,2);
+a2 = pz;
+pzmap(sys_cl)
+pzh = findobj(pz, 'Type', 'Line');
+pzh(2).MarkerSize = pz_msize;
+pzh(2).LineWidth = pz_lw;
+pzh(2).Color = 'g';
+pzh(3).MarkerSize = pz_msize;
+pzh(3).LineWidth = pz_lw;
+pzh(3).Color = 'r';
+title("PZ Map - Closed Loop System");
+grid on
+
+pz = subplot(4,1,3);
+a3 = pz;
+pzmap(sys_obsv)
+pzh = findobj(pz, 'Type', 'Line');
+pzh(2).MarkerSize = pz_msize;
+pzh(2).LineWidth = pz_lw;
+pzh(2).Color = 'g';
+pzh(3).MarkerSize = pz_msize;
+pzh(3).LineWidth = pz_lw;
+pzh(3).Color = 'r';
+title("PZ Map - Observer System");
+grid on
+
+pz = subplot(4,1,4);
+a4 = pz;
+pzmap(sys_w_obsv)
+pzh = findobj(pz, 'Type', 'Line');
+pzh(2).MarkerSize = pz_msize;
+pzh(2).LineWidth = pz_lw;
+pzh(2).Color = 'g';
+pzh(3).MarkerSize = pz_msize;
+pzh(3).LineWidth = pz_lw;
+pzh(3).Color = 'r';
+title("PZ Map - Full System With Observer");
+grid on
+
+linkaxes([a1, a2, a3, a4]);

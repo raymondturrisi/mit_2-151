@@ -1,0 +1,198 @@
+%Run Controller Design First
+
+close all;
+
+% Pointer to step responses
+src_directory = "data/2022-12-07";
+
+data = get_data_directory(src_directory);
+ydiff = 30;
+xdiff = 15;
+bar2Pa = 100000;
+
+%Analyze open loop data
+k = 1;
+
+for i = 1:length(data)
+    fig_name = sprintf("OL %d", i);
+    %Extract the experimental parameters
+    u = data{i}.signal_bar*bar2Pa;
+    t = data{i}.t;
+    t_0 = t(1);
+    t_n = t(end);
+
+    t_sim = linspace(t_0, t_n, (t_n-t_0)/mean(diff(t)));
+    u_sim = pchip(t, u, t_sim);
+    
+    %Get new state space equations about an operating point/start of the
+    %experiment
+    p_g0 = data{i}.piezo_bar(1)*bar2Pa;
+    l_dot_0 = 0;
+    l_0 = L_a-mean(data{i}.y(2:5))/1000;
+
+    f_0 = nlin_model(p_g0, l_0);
+    
+    [A,B,C,D] = get_model(p_g0, l_0, 6);
+
+    sys = ss(A,B,C,D);
+
+    x_0 = [0, 0, 0];
+    [Y,T,X] = lsim(sys, u_sim-p_g0, t_sim, x_0);
+    pg_sim = X(:,1);
+    l_sim = Y*1000;
+    lin_model = get_lin_model(p_g0, l_0);
+    f_sim = (lin_model(X(:,1), Y))+mass*9.81;
+    figure("Name", fig_name, "Position",[0+k*xdiff,400-k*ydiff,800,600])
+    set(gcf,'color','w');
+
+    subplot(3,1,1)
+    plot(data{i}.t, data{i}.signal_bar)
+    hold on
+    plot(data{i}.t, data{i}.piezo_bar)
+    plot(T,p_g0+pg_sim/bar2Pa)
+    subtitle("Pressures")
+    legend(["Measured", "Simulated"])
+    ylabel("Bar")
+    xlabel("Time (s)")
+    ylim([-1,6])
+
+    subplot(3,1,2)
+    plot(data{i}.t, data{i}.f)
+    hold on
+    plot(T, f_sim)
+    subtitle("Force")
+    legend(["Measured", "Simulated"])
+    ylabel("Newtons")
+    xlabel("Time (s)")
+
+    subplot(3,1,3)
+    plot(data{i}.t, data{i}.y-(L_a-l_0)*1000)
+    hold on
+    plot(T, -l_sim)
+    subtitle("Displacement")
+    legend(["Measured", "Simulated"])
+    ylabel("mm")
+    xlabel("Time (s)")
+
+    k=k+1;
+end
+
+
+%Analyze closed loop hypothetical data
+for i = 1:length(data)
+    fig_name = sprintf("CL %d", i);
+    %Extract the experimental parameters
+    t_sim = linspace(0, 20, 100*20);
+    y_ss = -0.010;
+    u_sim = [zeros(1,floor(length(t_sim)/3)), ones(1,ceil(length(t_sim)/3)),zeros(1,ceil(length(t_sim)/3))];
+    
+    %Get new state space equations about an operating point/start of the
+    %experiment
+    p_g0 = 200000;
+    l_dot_0 = 0;
+    l_0 = L_a+L_a*(-0.1);
+    f_0 = nlin_model(p_g0, l_0);
+  
+
+    [A,B,C,D] = get_model(p_g0, l_0, 6);
+    
+    %Place the poles
+    poles = [-17+17j,-17-17j,-10.5];
+    K = place(A, B, poles);
+
+    %Get converter from a desired steady state value to a theoretical
+    %desired pressure input
+    u2r = -inv(C*inv(A-B*K)*B);
+    
+    %Set an arbitrary deviation from the initial condition
+    y_ss = -0.020; %contraction
+    r = u_sim*u2r*y_ss;
+    A_cl = A-B*K;
+   
+    %First develop the closed loop system
+    sys_cl = ss(A_cl,B,C,D);
+    
+    %Develop an observer
+    L = place(A',C',3*poles);
+    A_obsv = (A-L'*C);
+
+    sys_obsv = ss(A_obsv, B, C, D);
+    
+    %Develop an system with full state feedback and an observer
+    A_w_obsv = [A -B*K;L'*C (A-B*K-L'*C)];
+    B_w_obsv = [B;B];
+    C_w_obsv = [C zeros(1,3)];
+    sys_w_obsv = ss(A_w_obsv, B_w_obsv, C_w_obsv, D);
+
+    %- - SIMULATE SYSTEMS - -
+    %Start from 0 deviation about the linearized point - simulate systems
+    x_0 = [0, 0, 0];
+
+    [Y_cl,T_cl,X_cl] = lsim(sys_cl, r, t_sim, x_0);
+    [Y_obsv,T_obsv,X_obsv] = lsim(sys_obsv, r, t_sim, x_0);
+    %Set a random seed so its repeatable - initialize observer to random
+    %values
+    rng(1)
+    x_0 = [0, 0, 0, 100000*rand, 0, 0.01*rand];
+    [Y_w_obsv,T_w_obsv,X_w_obsv] = lsim(sys_w_obsv, r, t_sim, x_0);
+    
+    %- - SYSTEMS SIMULATED - -
+    pg_sim = X(:,1);
+    l_cl_sim = Y_cl*1000;
+    l_obsv_sim = Y_obsv*1000;
+    l_w_obsv_sim = Y_w_obsv*1000;
+    
+    %Get the lambda function for predicting the linearized force which is
+    %internal to the system
+    lin_model = get_lin_model(p_g0, l_0);
+
+    f_cl_sim = (lin_model(X_cl(:,1), Y_cl))+mass*9.81;
+    f_w_obsv_s_sim = (lin_model(X_w_obsv(:,1), Y_w_obsv))+mass*9.81;
+    f_w_obsv_o_sim = (lin_model(X_w_obsv(:,4), Y_w_obsv))+mass*9.81;
+
+    %Open figure for comparing sims
+    figure("Name", fig_name, "Position",[0+k*xdiff,400-k*ydiff,800,600])
+    set(gcf,'color','w');
+
+
+    subplot(3,1,1)
+    %Estimated reference pressure
+    plot(t_sim, r/bar2Pa, "r-")
+    hold on
+    %Internal gauge pressures for each simulation
+    plot(t_sim, X_cl(:,1)/bar2Pa, "g--")
+    plot(t_sim, X_w_obsv(:,1)/bar2Pa, "b:")
+    plot(t_sim, X_w_obsv(:,4)/bar2Pa, "mo", markersize=1)
+    
+    subtitle("Pressures")
+    legend(["Input", "Closed Loop", "Full System - State", "Full System - Observer"])
+    ylabel("Bar")
+    xlabel("Time (s)")
+
+    subplot(3,1,2)
+    %plot displacements
+    %target
+    plot(t_sim, f_cl_sim, "g--")
+    hold on
+    %closed loop
+    plot(t_sim, f_w_obsv_s_sim, "b:")
+    plot(t_sim, f_w_obsv_o_sim, "mo", markersize=1)
+
+    subtitle("Force")
+    legend(["Closed Loop", "Full System - State", "Full System - Observer"])
+    ylabel("Newtons")
+    xlabel("Time (s)")
+
+    subplot(3,1,3)
+    plot(t_sim, y_ss*1000, "r-")
+    hold on
+    plot(t_sim, Y_cl*1000, "g--")
+    plot(t_sim, Y_w_obsv*1000, "mo", markersize=1)
+
+    subtitle("Displacement")
+    legend(["Input", "Closed Loop", "Observer", "Full System"])
+    ylabel("mm")
+    xlabel("Time (s)")
+    
+    k=k+1;
+end
