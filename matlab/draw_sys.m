@@ -41,7 +41,7 @@ function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
 
         % Plot all pen points thus far
         for j = 1:i 
-            scatter(x_p(1:j),y_p(1:j),'r.')
+            plot(x_p(1:j),y_p(1:j),'r.-')
             hold on;
         end
 
@@ -56,7 +56,7 @@ function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
         line([p2(1),p3(1)], [p2(2), p3(2)], 'Color', 'b','LineWidth',2);
         line([p1(1),p3(1)], [p1(2), p3(2)], 'Color', 'b','LineWidth',2);
         title( sprintf('time = %.3f sec', t(i)) );
-        axis([-1 1 -1 1]* (l+r)*1.1);
+        axis([-1 1 -1 1]* (l+r)*0.5);
 
 
         drawnow;

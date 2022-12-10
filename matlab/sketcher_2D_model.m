@@ -6,16 +6,31 @@ close all;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % V2 Setup system parameters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-l = 0.27; % Operating length of actuator[m]
+
+
+
+l_op = 0.27; % Operating length of actuator[m]
+Pg_op = 5e5; % Operating point pressure of actuator [Pa]
+
 triangle_r = 0.1; % Length from center of triangle to one of the attachments [m]
 m_t = 1; % Mass of triangle center [kg]
-I_t = 0.5*m_t*triangle_r^2; % Inertia of triangle [kg*m^2] #TODO CHANGE TO TRIANGLE
 b_l =50; % Linear damping of PAMs
 m_p = 0.5; % Mass of pen [kg]
 y_p_com = .01; % Vertical height of COM of pen [m]
 k_p = 1e4; % Radial stiffness of pen [N/m]
 b_p = 10; % Linear damping of pen tip on table
 l_pen = .1; %[m]
+
+tau = 0.01; % Fluid lowpass time constant [sec]
+
+global sys_params
+sys_params.tau = tau;
+sys_params.m_t = m_t;
+sys_params.m_p = m_p;
+sys_params.Pg_op = Pg_op;
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Actuator force linearization
@@ -63,14 +78,15 @@ F_nl_3 =subs(F_nl-b_l*L3_dot);
 
 % Define fixed coordinates where actuators attach to base
 % Center coordinate is (0,0)
-b_1 = [0; (l+triangle_r); 0];
-b_2 = [(l+triangle_r)*sin(2*pi/3); (l+triangle_r)*cos(2*pi/3); 0];
-b_3 = [(l+triangle_r)*sin(-2*pi/3); (l+triangle_r)*cos(-2*pi/3); 0];
+b_1 = [0; (l_op+triangle_r); 0];
+b_2 = [(l_op+triangle_r)*sin(2*pi/3); (l_op+triangle_r)*cos(2*pi/3); 0];
+b_3 = [(l_op+triangle_r)*sin(-2*pi/3); (l_op+triangle_r)*cos(-2*pi/3); 0];
 
 % Coordinate transformation between global coordinates and triangle
 % coordinates 
 syms theta 
 theta=0;
+omega=0;
 
 t_b = [cos(theta), -sin(theta), 0;
      sin(theta), cos(theta), 0;
@@ -82,7 +98,7 @@ b_t = [cos(theta), sin(theta), 0;
      0, 0, 1];
 
 % Solve for angles phi_1, 2, 3 given center of triangle position (base coordinates) and theta
-syms x_b y_b vx_b vy_b omega x_p y_p vx_p vy_p
+syms x_b y_b vx_b vy_b x_p y_p vx_p vy_p
 
 r1 = b_t*[triangle_r*sin(0); triangle_r*cos(0);0];    % Vector in base coordinates from center to attachment
 f1 = b_1 - ([x_b;y_b;0]+r1);        % Vector from actuator start to end
@@ -115,17 +131,6 @@ F_nl_1 =subs(F_nl_1);
 F_nl_2 =subs(F_nl_2);
 F_nl_3 =subs(F_nl_3);
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Plotting
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% t=linspace(0,2*pi,100);
-% x_b = .01*cos(t);
-% y_b = .01 *sin(t);
-% theta = zeros(1,100);
-% 
-% f=draw_sys(l,r,t,x_b,y_b,theta);
-% 
-% %%
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -137,12 +142,16 @@ f_x = F_nl_1 * f1(1)/sqrt(f1(1)^2+f1(2)^2) + F_nl_2 * f2(1)/sqrt(f2(1)^2+f2(2)^2
 f_y = F_nl_1 * f1(2)/sqrt(f1(1)^2+f1(2)^2) + F_nl_2 * f2(2)/sqrt(f1(1)^2+f1(2)^2) + F_nl_3 * f3(2)/sqrt(f1(1)^2+f1(2)^2) + k_p * (y_p-y_b);
 
 
-% Torque in theta dir
-T = -(F_nl_1*cross([triangle_r*sin(0); triangle_r*cos(0); 0],t_b*f1/L1) + F_nl_2*cross([triangle_r*sin(2*pi/3); triangle_r*cos(2*pi/3); 0],t_b*f2/L2) + F_nl_3*cross([triangle_r*sin(-2*pi/3); triangle_r*cos(-2*pi/3); 0],t_b*f3/L3)) ;
-
 % Pen force in x,y dir
 f_x_pen = k_p * (x_b-x_p) - b_p * vx_p;
 f_y_pen = k_p * (y_b-y_p) - b_p * vy_p;
+
+% Save for eqn to co
+sys_params.f_x_nl = f_x; 
+sys_params.f_y_nl = f_y;
+sys_params.f_x_p = f_x_pen;
+sys_params.f_y_p = f_y_pen;
+
 
 
 % Take partial derivatives
@@ -170,17 +179,6 @@ dfy_domega= diff(f_y,omega);
 dfy_dxp =  diff(f_y,x_p);
 dfy_dyp =  diff(f_y,y_p);
 
-dT_dPg1= diff(T,Pg1);
-dT_dPg2= diff(T,Pg2);
-dT_dPg3= diff(T,Pg3);
-dT_dxb= diff(T,x_b);
-dT_dyb= diff(T,y_b);
-dT_dtheta= diff(T,theta);
-dT_dvxb= diff(T,vx_b);
-dT_dvyb= diff(T,vy_b);
-dT_domega= diff(T,omega);
-dT_dxp =  diff(T,x_p);
-dT_dyp =  diff(T,y_p);
 
 
 dfx_pen_dxb =diff(f_x_pen,x_b);
@@ -202,13 +200,11 @@ dfy_pen_dvyp =diff(f_y_pen,vy_p);
 % Evaluate partials at operating point
 x_b = 0;
 y_b = 0;
-theta = 0;
 vx_b =0;
 vy_b = 0;
-omega=0;
-Pg1 = 3e5; %3 bar
-Pg2 = 3e5;
-Pg3 = 3e5;
+Pg1 = Pg_op;
+Pg2 = Pg_op;
+Pg3 = Pg_op;
 x_p = 0;
 y_p = 0;
 vx_p = 0;
@@ -239,16 +235,6 @@ dfy_dxp_op = double(subs(dfy_dxp));
 dfy_dyp_op = double(subs(dfy_dyp));
 
 
-dT_dPg1_op= double(subs(dT_dPg1));
-dT_dPg2_op= double(subs(dT_dPg2));
-dT_dPg3_op= double(subs(dT_dPg3));
-dT_dxb_op= double(subs(dT_dxb));
-dT_dyb_op= double(subs(dT_dyb));
-dT_dtheta_op= double(subs(dT_dtheta));
-dT_dvxb_op = double(subs(dT_dvxb));
-dT_dvyb_op = double(subs(dT_dvyb));
-dT_domega_op = double(subs(dT_domega));
-
 dfx_pen_dxb_op =double(subs(dfx_pen_dxb));
 dfx_pen_dyb_op =double(subs(dfx_pen_dyb));
 dfx_pen_dxp_op =double(subs(dfx_pen_dxp));
@@ -267,16 +253,14 @@ dfy_pen_dvyp_op =double(subs(dfy_pen_dvyp));
 
 
 % Taylor series expansion
-syms x_b y_b vx_b vy_b omega Pg1 Pg2 Pg3  x_p y_p vx_p vy_p
+syms x_b y_b vx_b vy_b Pg1 Pg2 Pg3  x_p y_p vx_p vy_p
 dfx= dfx_dPg1_op * Pg1 +  dfx_dPg2_op * Pg2 + dfx_dPg3_op * Pg3 + dfx_dxb_op * x_b...
     + dfx_dyb_op * y_b + dfx_dtheta_op*theta + dfx_dvxb_op*vx_b + dfx_dvyb_op*vy_b...
     + dfx_domega_op*omega + dfx_dxp*x_p + dfx_dyp*y_p;
 dfy= dfy_dPg1_op * Pg1 +  dfy_dPg2_op * Pg2 + dfy_dPg3_op * Pg3 + dfy_dxb_op * x_b...
     + dfy_dyb_op * y_b + dfy_dtheta_op*theta+ dfy_dvxb_op*vx_b + dfy_dvyb_op*vy_b...
     + dfy_domega_op*omega+ dfy_dxp*x_p + dfy_dyp*y_p;
-dT= dT_dPg1_op(3) * Pg1 +  dT_dPg2_op(3) * Pg2 + dT_dPg3_op(3) * Pg3 + dT_dxb_op(3) * x_b...
-    + dT_dyb_op(3) * y_b + dT_dtheta_op(3)*theta+ dT_dvxb_op*vx_b + dT_dvyb_op*vy_b...
-    + dT_domega_op*omega + dT_dxp*x_p + dT_dyp*y_p;
+
 
 dfx_pen = dfx_pen_dxb_op*x_b + dfx_pen_dyb_op*y_b + dfx_pen_dxp_op*x_p +dfx_pen_dyp_op*y_p...
     +dfx_pen_dvxp_op*vx_p + dfx_pen_dvyp_op*vy_p;
@@ -284,6 +268,8 @@ dfx_pen = dfx_pen_dxb_op*x_b + dfx_pen_dyb_op*y_b + dfx_pen_dxp_op*x_p +dfx_pen_
 dfy_pen = dfy_pen_dxb_op*x_b + dfy_pen_dyb_op*y_b + dfy_pen_dxp_op*x_p +dfy_pen_dyp_op*y_p...
     +dfy_pen_dvxp_op*vx_p + dfy_pen_dvyp_op*vy_p;
 
+sys_params.dfx=dfx;
+sys_params.dfy=dfy;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State Space Form
@@ -303,10 +289,7 @@ dfy_pen = dfy_pen_dxb_op*x_b + dfy_pen_dyb_op*y_b + dfy_pen_dxp_op*x_p +dfy_pen_
 %  P2_g_dot = x(11);
 %  P3_g_dot = x(12);
 
-tau = 0.0001; % Fluid lowpass time constant [sec]
-f_r = 1; % Flow inductance constant
-b = 0; % Linear damping
-b_r = 0.5; % Rotational damping
+
 
 M= [m_t, 0, 0, 0;
     0, m_t, 0, 0;
@@ -316,15 +299,15 @@ K =  [dfx_dxb_op, dfx_dyb_op,  dfx_dxp_op, dfx_dyp_op, dfx_dPg1_op, dfx_dPg2_op,
     dfy_dxb_op, dfy_dyb_op, dfy_dxp_op, dfy_dyp_op, dfy_dPg1_op, dfy_dPg2_op, dfy_dPg3_op, dfy_dvxb_op, dfy_dvyb_op, 0, 0;
     dfx_pen_dxb_op, dfx_pen_dyb_op, dfx_pen_dxp_op, dfx_pen_dyp_op, 0, 0, 0, 0, 0, dfx_pen_dvxp_op, dfx_pen_dvyp_op;
     dfy_pen_dxb_op, dfy_pen_dyb_op, dfy_pen_dxp_op, dfy_pen_dyp_op, 0, 0, 0, 0, 0, dfy_pen_dvxp_op, dfy_pen_dvyp_op];
-B = [0 0 0 0 0 0 0 -b 0 0 0;
-     0 0 0 0 0 0 0 0 -b 0 0;
-     0 0 0 0 0 0 0 0 0 0 0;
-     0 0 0 0 0 0 0 0 0 0 0];
+% B = [0 0 0 0 0 0 0 -b 0 0 0;
+%      0 0 0 0 0 0 0 0 -b 0 0;
+%      0 0 0 0 0 0 0 0 0 0 0;
+%      0 0 0 0 0 0 0 0 0 0 0];
 
 
 A=[zeros(4,7), eye(4);
     zeros(3,4),-1/tau*eye(3), zeros(3,4);
-    inv(M)*(B+K)];
+    inv(M)*(K)];
 
 
 B=[zeros(4,3);
@@ -336,25 +319,13 @@ B=[zeros(4,3);
 
 C = [1 0 0 0 0 0 0 0 0 0 0;
     0 1 0 0 0 0 0 0 0 0 0;
-    0 0 0 0 1 0 0 0 0 0 0];
+    0 0 0 0 1 1 1 0 0 0 0];
 %     l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0 0;
 %     0 l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0;
     
 P = [l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0 0;
      0 l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0];
 
-% REMOVE LOWPASS FOR NOW
-% A=[zeros(3), eye(3);
-%     inv(M)*(B(:,1:3)+K(:,1:3)), inv(M)*(B(:,7:9)+K(:,7:9))];
-% B=[zeros(3);
-%     inv(M)*(B(:,4:6)+K(:,4:6))];
-% 
-% C = [1 0 0 0 0 0;
-%     0 1 0 0 0 0;
-%     0 0 1 0 0 0;
-%     0 0 0 1 0 0;
-%     0 0 0 0 1 0;
-%     0 0 0 0 0 1];
 
 
 D = zeros(3,3);
@@ -429,35 +400,65 @@ ylabel('y_p [m]');
 % sgtitle('Step response for step in input pressure P1')
 
 % Initial condition response
-x0=[.15; .15;.15; .15; 0; 0; 0; 0; 0; 0; 0];
-[y,t,x]=initial(sys,x0,0.5);
+x0=[.15; .15;.15; .15; Pg_op; Pg_op; Pg_op; 0; 0; 0; 0];
+[y,t,x]=initial(sys,xabs2lin(x0),0.5);
+x=xlin2abs(x);
 
 figure();
-
-subplot(3,2,1); plot(t,x(:,1,1));
+subplot(4,1,1); plot(t,x(:,1,1));
+title('IC Response (linear)')
 xlabel('Time [s]');
 ylabel('x_b [m]');
-subplot(3,2,3); plot(t,x(:,2,1));
+subplot(4,1,2); plot(t,x(:,2,1));
 xlabel('Time [s]');
 ylabel('y_b [m]');
-subplot(3,2,5); plot(t,x(:,3,1));
+subplot(4,1,3); plot(t,x(:,3,1));
 xlabel('Time [s]');
-ylabel('theta [rad]');
-
-
-subplot(3,2,2); plot(t,x(:,4,1));
+ylabel('x_p [m]');
+subplot(4,1,4); plot(t,x(:,4,1));
 xlabel('Time [s]');
-ylabel('P1 [Pa]');
-subplot(3,2,4); plot(t,x(:,5,1));
-xlabel('Time [s]');
-ylabel('P2 [Pa]');
-subplot(3,2,6); plot(t,x(:,6,1));
-xlabel('Time [s]');
-ylabel('P3 [Pa]');
-sgtitle('Initial condition response (open loop)')
+ylabel('y_p [m]');
 
 
 %v=draw_sys('IC_response',l,r,t,x(:,1,1),x(:,2,1),x(:,3,1),x(:,4,1));
+
+t_sim=linspace(0,0.5,1000);
+
+sys_params.t = t_sim;
+sys_params.K=0;
+sys_params.u = @(x,K,r) ulin2abs(-K*xabs2lin(x));
+sys_params.r = @(t) t.*0;
+
+
+[t_nlin, x_nlin] = ode45(@(t,x) sys_nl(t,x), t_sim, x0);
+
+
+figure();
+subplot(4,1,1); plot(t,x(:,1,1));
+hold on;
+plot(t_nlin,x_nlin(:,1));
+legend('Linear', 'Nonlinear')
+title('IC Response')
+xlabel('Time [s]');
+ylabel('x_b [m]');
+subplot(4,1,2); plot(t,x(:,2));
+hold on;
+plot(t_nlin,x_nlin(:,2,1));
+legend('Linear', 'Nonlinear')
+xlabel('Time [s]');
+ylabel('y_b [m]');
+subplot(4,1,3); plot(t,x(:,3));
+hold on;
+plot(t_nlin,x_nlin(:,3,1));
+legend('Linear', 'Nonlinear')
+xlabel('Time [s]');
+ylabel('x_p [m]');
+subplot(4,1,4); plot(t,x(:,4));
+hold on;
+plot(t_nlin,x_nlin(:,4,1));
+legend('Linear', 'Nonlinear')
+xlabel('Time [s]');
+ylabel('y_p [m]');
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -465,7 +466,7 @@ sgtitle('Initial condition response (open loop)')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % LQR
-rho = 1/1000; % weighting variable
+rho = 1/1; % weighting variable
 
 % State definition
 %  x_b=x(1);
@@ -499,40 +500,91 @@ Qy=1./[x_b_max, y_b_max, x_p_max, y_p_max, P1_g_max, P2_g_max, P3_g_max, vx_b_ma
 Q =diag(Qy);
 
 
-Pin_max = 1;
-Ry = 1./[Pin_max, Pin_max, Pin_max].^2;
+Pin_max = .001;
+Ry = rho*1./[Pin_max, Pin_max, Pin_max].^2;
 
 R = diag(Ry);
 
 [K,S,CLP] = lqr(sys,Q,R);
 
-rad = .05;
-t=linspace(0,2*pi/10,200);
+
+
+rad = .02;
+t_sim=linspace(0,2*pi/10,200);
 w=10;
-y_ss = [rad*cos(w*t);rad*sin(w*t);zeros(1,length(t))];
+y_ss = [rad*cos(w*t_sim);rad*sin(w*t_sim);zeros(1,length(t_sim))];
 r = -inv(C*inv(A-B*K)*B)*y_ss;
 A_cl = A-B*K;
 
+sys_params.K = K;
+sys_params.u = @(x,K,r) ulin2abs(r-K*xabs2lin(x));
+sys_params.r = @(t) pchip(t_sim,r,t);
+
 sys_cl = ss(A_cl,B,C,D);
 
-[y,t,x]=lsim(sys_cl,r,t);
+figure()
+iopzplot(sys_cl)
 
-draw_sys('traj_response',l,triangle_r,t,x(:,1,1),x(:,2,1),x(:,3,1),x(:,4,1));
+[y,t,x]=lsim(sys_cl,r,t_sim);
+x=xlin2abs(x);
+
+x0=[y_ss(1,1); y_ss(2,1); y_ss(1,1); y_ss(2,1); Pg_op; Pg_op; Pg_op; 0; 0; 0; 0];
+x0=xfill_init_pressures(x0)
+[t_nlin, x_nlin] = ode45(@(t,x) sys_nl(t,x), t_sim, x0);
 
 figure();
-
 subplot(4,1,1); plot(t,x(:,1,1));
+hold on;
+plot(t_nlin,x_nlin(:,1));
+legend('Linear', 'Nonlinear')
+title('Circle trajectory')
 xlabel('Time [s]');
 ylabel('x_b [m]');
-subplot(4,1,2); plot(t,x(:,2,1));
+subplot(4,1,2); plot(t,x(:,2));
+hold on;
+plot(t_nlin,x_nlin(:,2,1));
+legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_b [m]');
-subplot(4,1,3); plot(t,x(:,3,1));
+subplot(4,1,3); plot(t,x(:,3));
+hold on;
+plot(t_nlin,x_nlin(:,3,1));
+legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('x_p [m]');
-subplot(4,1,4); plot(t,x(:,4,1));
+subplot(4,1,4); plot(t,x(:,4));
+hold on;
+plot(t_nlin,x_nlin(:,4,1));
+legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_p [m]');
+
+
+figure();
+subplot(3,1,1); plot(t,x(:,5,1));
+xlabel('Time [s]');
+ylabel('P1 [Pa]');
+subplot(3,1,2); plot(t,x(:,6,1));
+xlabel('Time [s]');
+ylabel('P2 [Pa]');
+subplot(3,1,3); plot(t,x(:,7,1));
+xlabel('Time [s]');
+ylabel('P3 [Pa]');
+
+draw_sys('traj_response_nl',l_op,triangle_r,t_nlin,x_nlin(:,1,1),x_nlin(:,2,1),x_nlin(:,3,1),x_nlin(:,4,1));
+plot(rad*cos(w*t_sim),rad*sin(w*t_sim))
+
+%%% Adding observer
+cl_poles = eig(A_cl);
+L = place(A',C',3*cl_poles);
+
+
+A_w_obsv = [A -B*K;L'*C (A-B*K-L'*C)];
+B_w_obsv = [B;B];
+C_w_obsv = [C zeros(size(C))];
+sys_w_obsv = ss(A_w_obsv, B_w_obsv, C_w_obsv, D);
+
+
 
 
 % 
@@ -574,4 +626,117 @@ ylabel('y_p [m]');
 % ylabel('P3 [Pa]');
 % sgtitle('Initial condition response (LQR)')
 
+function xdot = sys_nl(t,x)
+    global sys_params
 
+
+
+    % State extraction
+    x_b=x(1);
+    y_b=x(2);
+    x_p=x(3);
+    y_p = x(4);
+    Pg1 = x(5);
+    Pg2 = x(6);
+    Pg3 = x(7);
+    vx_b=x(8);
+    vy_b=x(9);
+    vx_p=x(10);
+    vy_p=x(11);
+
+
+    % Extract important sys parameters
+    tau = sys_params.tau;
+    m_t = sys_params.m_t;
+    m_p = sys_params.m_p;
+
+
+
+    % Force calculation
+    f_x=double(subs(sys_params.f_x_nl));
+    f_y=double(subs(sys_params.f_y_nl));
+    f_x_p = double(subs(sys_params.f_x_p));
+    f_y_p = double(subs(sys_params.f_y_p));
+
+    % State equations
+    r = sys_params.r(t);
+    u = sys_params.u(x,sys_params.K,r);
+
+
+    % Return the state derivatives
+    xdot = [vx_b;
+            vy_b;
+            vx_p;
+            vy_p;
+            -1/tau * (Pg1 - u(1));
+            -1/tau * (Pg2 - u(2));
+            -1/tau * (Pg3 - u(3));
+            f_x/m_t;
+            f_y/m_t;
+            f_x_p/m_p;
+            f_y_p/m_p];
+end
+
+function x_lin = xabs2lin(x_abs)
+    global sys_params
+    
+    x_lin = x_abs;
+    x_lin(5) = x_lin(5)-sys_params.Pg_op;
+    x_lin(6) = x_lin(6)-sys_params.Pg_op;
+    x_lin(7) = x_lin(7)-sys_params.Pg_op;
+
+end
+
+function x_abs = xlin2abs(x_lin)
+    global sys_params
+    
+    x_abs = x_lin;
+    x_abs(5) = x_lin(5)+sys_params.Pg_op;
+    x_abs(6) = x_lin(6)+sys_params.Pg_op;
+    x_abs(7) = x_lin(7)+sys_params.Pg_op;
+
+end
+
+function u_lin = uabs2lin(u_abs)
+    global sys_params
+    
+    u_lin = u_abs-sys_params.Pg_op;
+    
+
+end
+
+
+function u_abs = ulin2abs(u_lin)
+    global sys_params
+    
+    u_abs = u_lin+sys_params.Pg_op;
+    
+end
+
+
+function x_with_p = xfill_init_pressures(x)
+    global sys_params
+
+    f_x_nl = sys_params.f_x_nl;
+    f_y_nl = sys_params.f_y_nl;
+
+    % State extraction
+    x_b=x(1);
+    y_b=x(2);
+    x_p=x(3);
+    y_p =x(4);
+    vx_b=x(8);
+    vy_b=x(9);
+    vx_p=x(10);
+    vy_p=x(11);
+
+    syms Pg1 Pg2 Pg3
+    eqn3= Pg1 + Pg2 + Pg3 ==3*sys_params.Pg_op;
+    soln = vpasolve([subs(f_x_nl)==0, subs(f_y_nl)==0, eqn3],[Pg1, Pg2, Pg3]);
+
+    x_with_p = x;
+    x_with_p(5)=soln.Pg1(1)
+    x_with_p(6)=soln.Pg2(1)
+    x_with_p(7)=soln.Pg3(1)
+
+end
