@@ -12,16 +12,16 @@ close all;
 l_op = 0.27; % Operating length of actuator[m]
 Pg_op = 5e5; % Operating point pressure of actuator [Pa]
 
-triangle_r = 0.1; % Length from center of triangle to one of the attachments [m]
+triangle_r = 0.10; % Length from center of triangle to one of the attachments [m]
 m_t = 1; % Mass of triangle center [kg]
 b_l =50; % Linear damping of PAMs
 m_p = 0.5; % Mass of pen [kg]
-y_p_com = .01; % Vertical height of COM of pen [m]
+%y_p_com = .01; % Vertical height of COM of pen [m]
 k_p = 1e4; % Radial stiffness of pen [N/m]
 b_p = 10; % Linear damping of pen tip on table
-l_pen = .1; %[m]
+%l_pen = .1; %[m]
 
-tau = 0.01; % Fluid lowpass time constant [sec]
+tau = 0.001; % Fluid lowpass time constant [sec]
 
 global sys_params
 sys_params.tau = tau;
@@ -147,12 +147,12 @@ f_x_pen = k_p * (x_b-x_p) - b_p * vx_p;
 f_y_pen = k_p * (y_b-y_p) - b_p * vy_p;
 
 % Save for eqn to co
-sys_params.f_x_nl = f_x; 
-sys_params.f_y_nl = f_y;
-sys_params.f_x_p = f_x_pen;
-sys_params.f_y_p = f_y_pen;
-
-
+sys_params.f_x_nl = matlabFunction(f_x,'Vars',{x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p}); 
+sys_params.f_y_nl =  matlabFunction(f_y,'Vars',{x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p});
+sys_params.f_x_p =  matlabFunction(f_x_pen,'Vars',{x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p});
+sys_params.f_y_p =  matlabFunction(f_y_pen,'Vars',{x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p});
+sys_params.f_x_nl_sym = f_x;
+sys_params.f_y_nl_sym = f_y;
 
 % Take partial derivatives
 dfx_dPg1= diff(f_x,Pg1);
@@ -320,13 +320,25 @@ B=[zeros(4,3);
 C = [1 0 0 0 0 0 0 0 0 0 0;
     0 1 0 0 0 0 0 0 0 0 0;
     0 0 0 0 1 1 1 0 0 0 0];
-%     l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0 0;
-%     0 l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0;
-    
-P = [l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0 0;
-     0 l_pen/y_p_com 0 -l_pen/y_p_com 0 0 0 0 0 0 0];
 
+% C_pen = [1+l_pen/y_p_com 0 -l_pen/y_p_com 0  0 0 0 0 0 0 0;
+%          0 1+l_pen/y_p_com 0 -l_pen/y_p_com 0  0 0 0 0 0 0;
+%          0 0 0 0 1 1 1 0 0 0 0];
+C_pen = [0 0 1 0 0 0 0 0 0 0 0;
+         0 0 0 1 0 0 0 0 0 0 0;
+         0 0 0 0 1 1 1 0 0 0 0];
 
+C=C_pen;
+
+sys_params.C=C;
+sys_params.C_pen=C_pen;
+sys_params.A=A;
+sys_params.B=B;
+sys_params.R=zeros(11,3);
+sys_params.r=@(t) zeros(3,1);
+sys_params.u=@(x,k,r) Pg_op * ones(3,1);
+sys_params.y_ss=@(t) zeros(3,1);
+sys_params.K=0;
 
 D = zeros(3,3);
 
@@ -337,6 +349,7 @@ sys = ss(A,B,C,D);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % System analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('Performing system analysis... \n')
 
 % Look at system controllability
 [ABAR,BBAR,CBAR,T,ctrb_states]=ctrbf(A,B,C);
@@ -400,70 +413,58 @@ ylabel('y_p [m]');
 % sgtitle('Step response for step in input pressure P1')
 
 % Initial condition response
+
+
 x0=[.15; .15;.15; .15; Pg_op; Pg_op; Pg_op; 0; 0; 0; 0];
-[y,t,x]=initial(sys,xabs2lin(x0),0.5);
-x=xlin2abs(x);
-
-figure();
-subplot(4,1,1); plot(t,x(:,1,1));
-title('IC Response (linear)')
-xlabel('Time [s]');
-ylabel('x_b [m]');
-subplot(4,1,2); plot(t,x(:,2,1));
-xlabel('Time [s]');
-ylabel('y_b [m]');
-subplot(4,1,3); plot(t,x(:,3,1));
-xlabel('Time [s]');
-ylabel('x_p [m]');
-subplot(4,1,4); plot(t,x(:,4,1));
-xlabel('Time [s]');
-ylabel('y_p [m]');
-
-
-%v=draw_sys('IC_response',l,r,t,x(:,1,1),x(:,2,1),x(:,3,1),x(:,4,1));
-
 t_sim=linspace(0,0.5,1000);
-
 sys_params.t = t_sim;
 sys_params.K=0;
-sys_params.u = @(x,K,r) ulin2abs(-K*xabs2lin(x));
-sys_params.r = @(t) t.*0;
 
 
+fprintf('Simulating IC response (linear)... \n')
+[t, x] = ode45(@(t,x) sys_l(t,x), t_sim, xabs2lin(x0));
+x=xlin2abs(x');
+[x_b_l, y_b_l, x_p_l, y_p_l]=get_coord_from_states(x);
+
+
+fprintf('Simulating IC response (nonlinear)... \n')
 [t_nlin, x_nlin] = ode45(@(t,x) sys_nl(t,x), t_sim, x0);
-
+x_nlin=x_nlin';
+[x_b_nl, y_b_nl, x_p_nl, y_p_nl]=get_coord_from_states(x_nlin);
 
 figure();
-subplot(4,1,1); plot(t,x(:,1,1));
+subplot(4,1,1); plot(t,x_b_l);
 hold on;
-plot(t_nlin,x_nlin(:,1));
+plot(t_nlin,x_b_nl);
 legend('Linear', 'Nonlinear')
-title('IC Response')
+title('Circle trajectory (coordinates)')
 xlabel('Time [s]');
 ylabel('x_b [m]');
-subplot(4,1,2); plot(t,x(:,2));
+subplot(4,1,2); plot(t,y_b_l);
 hold on;
-plot(t_nlin,x_nlin(:,2,1));
+plot(t_nlin,y_b_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_b [m]');
-subplot(4,1,3); plot(t,x(:,3));
+subplot(4,1,3); plot(t,x_p_l);
 hold on;
-plot(t_nlin,x_nlin(:,3,1));
+plot(t_nlin,x_p_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('x_p [m]');
-subplot(4,1,4); plot(t,x(:,4));
+subplot(4,1,4); plot(t,y_p_l);
 hold on;
-plot(t_nlin,x_nlin(:,4,1));
+plot(t_nlin,y_p_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_p [m]');
 
+draw_sys('IC_response',l_op,triangle_r,t,x_b_l,y_b_l,x_p_l,y_p_l,0.4);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Controller design
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('Performing LQR design... \n')
 
 % LQR
 rho = 1/1; % weighting variable
@@ -508,56 +509,65 @@ R = diag(Ry);
 [K,S,CLP] = lqr(sys,Q,R);
 
 
-
+fprintf('Generating circle trajectory... \n')
 rad = .02;
 t_sim=linspace(0,2*pi/10,200);
 w=10;
 y_ss = [rad*cos(w*t_sim);rad*sin(w*t_sim);zeros(1,length(t_sim))];
-r = -inv(C*inv(A-B*K)*B)*y_ss;
+r = -inv(C_pen*inv(A-B*K)*B)*y_ss;
 A_cl = A-B*K;
 
 sys_params.K = K;
 sys_params.u = @(x,K,r) ulin2abs(r-K*xabs2lin(x));
 sys_params.r = @(t) pchip(t_sim,r,t);
+sys_params.pp_matrix = -inv(C_pen*inv(A-B*K)*B);
 
 sys_cl = ss(A_cl,B,C,D);
 
 figure()
 iopzplot(sys_cl)
 
-[y,t,x]=lsim(sys_cl,r,t_sim);
+%{
+x0 = [y_ss(1,1); y_ss(2,1); y_ss(1,1); y_ss(2,1); Pg_op; Pg_op; Pg_op; 0; 0; 0; 0];
+x0 = xfill_init_pressures_l(x0);
+fprintf('Simulating circle trajectory (linear)... \n')
+[y,t,x]=lsim(sys_cl,r,t_sim,xabs2lin(x0));
 x=xlin2abs(x);
+[x_b_l, y_b_l, x_p_l, y_p_l]=get_coord_from_states(x');
 
-x0=[y_ss(1,1); y_ss(2,1); y_ss(1,1); y_ss(2,1); Pg_op; Pg_op; Pg_op; 0; 0; 0; 0];
-x0=xfill_init_pressures(x0)
+
+x0=xfill_init_pressures_nl(x0);
+fprintf('Simulating circle trajectory (nonlinear)... \n')
 [t_nlin, x_nlin] = ode45(@(t,x) sys_nl(t,x), t_sim, x0);
+[x_b_nl, y_b_nl, x_p_nl, y_p_nl]=get_coord_from_states(x_nlin');
 
 figure();
-subplot(4,1,1); plot(t,x(:,1,1));
+subplot(4,1,1); plot(t,x_b_l);
 hold on;
-plot(t_nlin,x_nlin(:,1));
+plot(t_nlin,x_b_nl);
 legend('Linear', 'Nonlinear')
 title('Circle trajectory')
 xlabel('Time [s]');
 ylabel('x_b [m]');
-subplot(4,1,2); plot(t,x(:,2));
+subplot(4,1,2); plot(t,y_b_l);
 hold on;
-plot(t_nlin,x_nlin(:,2,1));
+plot(t_nlin,y_b_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_b [m]');
-subplot(4,1,3); plot(t,x(:,3));
+subplot(4,1,3); plot(t,x_p_l);
 hold on;
-plot(t_nlin,x_nlin(:,3,1));
+plot(t_nlin,x_p_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('x_p [m]');
-subplot(4,1,4); plot(t,x(:,4));
+subplot(4,1,4); plot(t,y_p_l);
 hold on;
-plot(t_nlin,x_nlin(:,4,1));
+plot(t_nlin,y_p_nl);
 legend('Linear', 'Nonlinear')
 xlabel('Time [s]');
 ylabel('y_p [m]');
+
 
 
 figure();
@@ -570,66 +580,363 @@ ylabel('P2 [Pa]');
 subplot(3,1,3); plot(t,x(:,7,1));
 xlabel('Time [s]');
 ylabel('P3 [Pa]');
+%}
 
-draw_sys('traj_response_nl',l_op,triangle_r,t_nlin,x_nlin(:,1,1),x_nlin(:,2,1),x_nlin(:,3,1),x_nlin(:,4,1));
-plot(rad*cos(w*t_sim),rad*sin(w*t_sim))
+%draw_sys('traj_response_nl',l_op,triangle_r,t_nlin,x_nlin(:,1,1),x_nlin(:,2,1),x_nlin(:,3,1),x_nlin(:,4,1));
+%plot(rad*cos(w*t_sim),rad*sin(w*t_sim))
 
-%%% Adding observer
-cl_poles = eig(A_cl);
-L = place(A',C',3*cl_poles);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Redo for augmented system
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('Augmenting state matrix... \n')
+C_aug = [C, zeros(3,2)];
+C_pen_aug = [C_pen, zeros(3,2)];
+A_aug = [A, zeros(length(A),2);
+         -C_pen_aug(1:2,:)];
+B_aug = [B; 
+        0, 0, 0; 
+        0, 0, 0];
+R_aug = [zeros(length(A),3);
+    1, 0, 0;
+    0, 1, 0];
+
+C_aug=C_pen_aug;
+
+sys_params.C = C_aug;
+sys_params.C_pen = C_pen_aug;
+sys_params.A = A_aug;
+sys_params.B = B_aug;
+sys_params.R = R_aug;
+
+% Look at system controllability
+[ABAR,BBAR,CBAR,T,ctrb_states]=ctrbf(A_aug,B_aug,C_aug);
+fprintf('Number of controllable states for augmented system: %0.0f\n',sum(ctrb_states));
+[ABAR,BBAR,CBAR,T,obsv_states]=obsvf(A_aug,B_aug,C_aug);
+fprintf('Number of observable states for augmented system: %0.0f\n',sum(obsv_states));
+
+sys_aug = ss(A_aug,B_aug,C_aug,D);
+
+fprintf('Performing LQR design for augmented system... \n')
+% LQR for augmented system
+rho = 1/1; % weighting variable
+
+% State definition
+%  x_b=x(1);
+%  y_b=x(2);
+%  x_p=x(3);
+%  y_p = x(4)
+%  P1_g = x(5);
+%  P2_g = x(6);
+%  P3_g = x(7);
+%  vx_b=x(8);
+%  vy_b=x(9);
+%  vx_p=x(10);
+%  =x(11);
+%  vy_p=x(11);
+%  vy_p=x(11);
+%  integral of e_xp
+%  integral of e_yp
+
+% State errors
+x_b_max = 1e6;
+y_b_max = 1e6;
+x_p_max = 1e6;
+y_p_max = 1e6;
+P1_g_max =1000000000;
+P2_g_max =1000000000;
+P3_g_max =1000000000;
+vx_b_max = 1e-2;
+vy_b_max = 1e-2;
+vx_p_max = 1e-3;
+vy_p_max = 1e-3;
+e_xp_max = 0.00005e-3;
+e_yp_max = 0.00005e-3;
 
 
-A_w_obsv = [A -B*K;L'*C (A-B*K-L'*C)];
-B_w_obsv = [B;B];
-C_w_obsv = [C zeros(size(C))];
-sys_w_obsv = ss(A_w_obsv, B_w_obsv, C_w_obsv, D);
+
+Qy=1./[x_b_max, y_b_max, x_p_max, y_p_max, P1_g_max, P2_g_max, P3_g_max, vx_b_max, vy_b_max, vx_p_max, vy_p_max, e_xp_max, e_yp_max].^2;
+Q =diag(Qy);
+
+
+Pin_max = 1e3;
+Ry = rho*1./[Pin_max, Pin_max, Pin_max].^2;
+
+R = diag(Ry);
+
+[K_aug,S,CLP] = lqr(sys_aug,Q,R);
+%K_aug(:,12:13) = 100000.*K_aug(:,12:13);
+
+A_cl_aug = A_aug-B_aug*K_aug;
+eig(A_cl_aug)
+sys_cl_aug = ss(A_cl_aug,B_aug,C_aug,D);
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Circle Trajectory
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('Generating circle trajectory (augmented)... \n')
+t_sim=linspace(0,2*pi/10,200);
+y_ss = [rad*cos(w*t_sim);rad*sin(w*t_sim);zeros(1,length(t_sim))];
+%r = -inv(C_pen_aug*inv(A_aug-B_aug*K_aug)*B_aug)*y_ss;
 
+sys_params.A_cl = A_cl_aug;
+sys_params.y_ss = @(t) pchip(t_sim,y_ss,t);
+sys_params.K = K_aug;
+sys_params.C = C_aug;
+sys_params.C_pen = C_pen_aug;
+
+sys_params.u = @(x,K,r) ulin2abs(r-K*xabs2lin(x));
+sys_params.r = @(t) pchip(t_sim,r,t);
+
+
+x0=[y_ss(1,1); y_ss(2,1); y_ss(1,1); y_ss(2,1); Pg_op; Pg_op; Pg_op; 0; rad*w; 0; rad*w; 0; 0];
+x0=xfill_init_pressures_l(x0);
+
+fprintf('Simulating circle trajectory (aug linear)... \n')
+%[y,t,x]=lsim(sys_cl_aug,r,t_sim,xabs2lin(x0));
+[t, x] = ode45(@(t,x) sys_l(t,x), t_sim, xabs2lin(x0));
+x=xlin2abs(x');
+[x_b_l, y_b_l, x_p_l, y_p_l]=get_coord_from_states(x);
+
+
+fprintf('Simulating circle trajectory (aug nonlinear)... \n')
+x0=xfill_init_pressures_nl(x0);
+[t_nlin, x_nlin] = ode45(@(t,x) sys_nl_aug(t,x), t_sim, x0);
+x_nlin=x_nlin';
+[x_b_nl, y_b_nl, x_p_nl, y_p_nl]=get_coord_from_states(x_nlin);
+
+figure();
+subplot(4,1,1); plot(t,x_b_l);
+hold on;
+plot(t_nlin,x_b_nl);
+legend('Linear', 'Nonlinear')
+title('Circle trajectory (coordinates)')
+xlabel('Time [s]');
+ylabel('x_b [m]');
+subplot(4,1,2); plot(t,y_b_l);
+hold on;
+plot(t_nlin,y_b_nl);
+legend('Linear', 'Nonlinear')
+xlabel('Time [s]');
+ylabel('y_b [m]');
+subplot(4,1,3); plot(t,x_p_l);
+hold on;
+plot(t_nlin,x_p_nl);
+plot(t_sim,y_ss(1,:));
+legend('Linear', 'Nonlinear','Trajectory')
+xlabel('Time [s]');
+ylabel('x_p [m]');
+subplot(4,1,4); plot(t,y_p_l);
+hold on;
+plot(t_nlin,y_p_nl);
+plot(t_sim,y_ss(2,:));
+legend('Linear', 'Nonlinear','Trajectory')
+xlabel('Time [s]');
+ylabel('y_p [m]');
+print -dpdf 01coords
+
+figure();
+subplot(2,1,1); plot(t,x(12,:));
+hold on;
+plot(t_nlin,x_nlin(12,:));
+xlabel('Time [s]');
+ylabel('ex_p [m]');
+legend('Linear', 'Nonlinear')
+title('Circle trajectory (integrator errors)')
+subplot(2,1,2); plot(t,x(13,:));
+hold on;
+plot(t_nlin,x_nlin(13,:));
+xlabel('Time [s]');
+ylabel('ey_p [m]');
+legend('Linear', 'Nonlinear')
+print -dpdf 02integrators
+
+r=ulin2abs(r);
+figure();
+subplot(3,1,1); plot(t,x(5,:));
+hold on; plot(t_nlin,x_nlin(5,:));
+plot(t_sim,r(1,:));
+title('Circle trajectory (Pressures)')
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P1 [Pa]');
+subplot(3,1,2); plot(t,x(6,:));
+hold on; plot(t_nlin,x_nlin(6,:));
+plot(t_sim,r(2,:));
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P2 [Pa]');
+subplot(3,1,3); plot(t,x(7,:));
+hold on; plot(t_nlin,x_nlin(7,:));
+plot(t_sim,r(3,:));
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P3 [Pa]');
+print -dpdf 03pressures
+
+%draw_sys('traj_response_nl_aug',l_op,triangle_r,t_nlin,x_b_nl,y_b_nl,x_p_nl,y_p_nl);
+
+r=uabs2lin(r);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Mech E Logo Trajectory
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+sketch_time = 3; %time to sketch
+[t_sim, y_ss, r, x0] = get_trajectory('meche_logo.csv',sketch_time);
+sys_params.y_ss = @(t) [interp1(t_sim,y_ss(1,:),t);interp1(t_sim,y_ss(2,:),t);interp1(t_sim,y_ss(3,:),t)];
+sys_params.r =  @(t) [interp1(t_sim,r(1,:),t);interp1(t_sim,r(2,:),t);interp1(t_sim,r(3,:),t)];
+
+
+
+fprintf('Simulating meche logo trajectory (aug linear)... \n')
+x0=xfill_init_pressures_l(x0);
+[t, x] = ode45(@(t,x) sys_l(t,x), t_sim, xabs2lin(x0));
+x=xlin2abs(x');
+[x_b_l, y_b_l, x_p_l, y_p_l]=get_coord_from_states(x);
+
+
+fprintf('Simulating mech e logo trajectory (aug nonlinear)... \n')
+x0=xfill_init_pressures_nl(x0);
+[t_nlin, x_nlin] = ode45(@(t,x) sys_nl_aug(t,x), t_sim, x0);
+x_nlin=x_nlin';
+[x_b_nl, y_b_nl, x_p_nl, y_p_nl]=get_coord_from_states(x_nlin);
+
+figure();
+subplot(4,1,1); plot(t,x_b_l);
+hold on;
+plot(t_nlin,x_b_nl);
+legend('Linear', 'Nonlinear')
+title('Circle trajectory (coordinates)')
+xlabel('Time [s]');
+ylabel('x_b [m]');
+subplot(4,1,2); plot(t,y_b_l);
+hold on;
+plot(t_nlin,y_b_nl);
+legend('Linear', 'Nonlinear')
+xlabel('Time [s]');
+ylabel('y_b [m]');
+subplot(4,1,3); plot(t,x_p_l);
+hold on;
+plot(t_nlin,x_p_nl);
+plot(t_sim,y_ss(1,:));
+legend('Linear', 'Nonlinear','Trajectory')
+xlabel('Time [s]');
+ylabel('x_p [m]');
+subplot(4,1,4); plot(t,y_p_l);
+hold on;
+plot(t_nlin,y_p_nl);
+plot(t_sim,y_ss(2,:));
+legend('Linear', 'Nonlinear','Trajectory')
+xlabel('Time [s]');
+ylabel('y_p [m]');
+print -dpdf 01coords
+
+figure();
+subplot(2,1,1); plot(t,x(12,:));
+hold on;
+plot(t_nlin,x_nlin(12,:));
+xlabel('Time [s]');
+ylabel('ex_p [m]');
+legend('Linear', 'Nonlinear')
+title('Circle trajectory (integrator errors)')
+subplot(2,1,2); plot(t,x(13,:));
+hold on;
+plot(t_nlin,x_nlin(13,:));
+xlabel('Time [s]');
+ylabel('ey_p [m]');
+legend('Linear', 'Nonlinear')
+print -dpdf 02integrators
+
+r=ulin2abs(r);
+figure();
+subplot(3,1,1); plot(t,x(5,:));
+hold on; plot(t_nlin,x_nlin(5,:));
+plot(t_sim,r(1,:));
+title('Circle trajectory (Pressures)')
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P1 [Pa]');
+subplot(3,1,2); plot(t,x(6,:));
+hold on; plot(t_nlin,x_nlin(6,:));
+plot(t_sim,r(2,:));
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P2 [Pa]');
+subplot(3,1,3); plot(t,x(7,:));
+hold on; plot(t_nlin,x_nlin(7,:));
+plot(t_sim,r(3,:));
+legend('Linear','Nonlinear','Reference prediction')
+xlabel('Time [s]');
+ylabel('P3 [Pa]');
+print -dpdf 03pressures
+
+figure()
+subplot(3,1,1);plot(y_ss(1,:),y_ss(2,:));
+title(sprintf('Mech E Logo Trajectory (sketch time=%0.0f sec)',sketch_time));
+legend('Trajectory','Location','southeast')
+subplot(3,1,2);plot(x_p_l,y_p_l);
+legend('Linear','Location','southeast')
+subplot(3,1,3);plot(x_p_nl,y_p_nl);
+legend('Nonlinear','Location','southeast')
+print -dpdf trajectories
+
+
+draw_sys('meche_logo_nl_aug',l_op,triangle_r,t_nlin,x_b_nl,y_b_nl,x_p_nl,y_p_nl,.05);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Adding observer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% % %%% Adding observer
+% C_obs = [0     0     0     0     0     0     0     0     0     0     0     1     0;
+%         0     0     0     0     0     0     0     0     0     0     0     0     1;
+%          0     0     0     0     1     1     1     0     0     0     0     0     0];
+% 
+% cl_poles = eig(A_cl_aug);
+% [ABAR,BBAR,CBAR,T,obsv_states]=obsvf(A_aug,B_aug,C_obs);
+% fprintf('Number of observable states for observability system: %0.0f\n',sum(obsv_states));
 % 
 % 
-% figure();
-% step(sys_cl,3,opt)
-% title('Step response after LQR')
-% 
-% figure();
-% pzmap(sys_cl)
-% title("LQR Closed Loop Poles")
-% 
-% % Initial condition response
-% x0=[.01; .01; .05; 0; 0; 0; 0; 0; 0];
-% [y,t,x]=initial(sys_cl,x0,5);
-% 
-% figure();
+% L = place(A_aug',C_aug',3*cl_poles);
 % 
 % 
-% subplot(3,2,1); plot(t,x(:,1,1));
-% xlabel('Time [s]');
-% ylabel('x_b [m]');
-% subplot(3,2,3); plot(t,x(:,2,1));
-% xlabel('Time [s]');
-% ylabel('y_b [m]');
-% subplot(3,2,5); plot(t,x(:,3,1));
-% xlabel('Time [s]');
-% ylabel('theta [rad]');
 % 
 % 
-% subplot(3,2,2); plot(t,x(:,4,1));
-% xlabel('Time [s]');
-% ylabel('P1 [Pa]');
-% subplot(3,2,4); plot(t,x(:,5,1));
-% xlabel('Time [s]');
-% ylabel('P2 [Pa]');
-% subplot(3,2,6); plot(t,x(:,6,1));
-% xlabel('Time [s]');
-% ylabel('P3 [Pa]');
-% sgtitle('Initial condition response (LQR)')
+% A_w_obsv = [A_aug -B_aug*K_aug;L'*C_obs (A_aug-B_aug*K_aug-L'*C_obs)];
+% B_w_obsv = [B_aug;B_aug];
+% C_w_obsv = [C_obs zeros(size(C))];
+% sys_w_obsv = ss(A_w_obsv, B_w_obsv, C_w_obsv, D);
+% 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function xdot = sys_l(t,x)
+    global sys_params
+
+    A=sys_params.A;
+    B=sys_params.B;
+    R=sys_params.R;
+
+    % State equations
+    y_ss = sys_params.y_ss(t);
+    r = sys_params.r(t);
+    u = uabs2lin(sys_params.u(xlin2abs(x),sys_params.K,r));
+
+
+    % Return the state derivatives
+    xdot = A*x+B*u+R*y_ss;
+end
 
 function xdot = sys_nl(t,x)
     global sys_params
-
-
 
     % State extraction
     x_b=x(1);
@@ -651,12 +958,11 @@ function xdot = sys_nl(t,x)
     m_p = sys_params.m_p;
 
 
-
     % Force calculation
-    f_x=double(subs(sys_params.f_x_nl));
-    f_y=double(subs(sys_params.f_y_nl));
-    f_x_p = double(subs(sys_params.f_x_p));
-    f_y_p = double(subs(sys_params.f_y_p));
+    f_x=sys_params.f_x_nl(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_y=sys_params.f_y_nl(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_x_p = sys_params.f_x_p(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_y_p = sys_params.f_y_p(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
 
     % State equations
     r = sys_params.r(t);
@@ -677,13 +983,72 @@ function xdot = sys_nl(t,x)
             f_y_p/m_p];
 end
 
+function xdot = sys_nl_aug(t,x)
+    fprintf('t = %0.4f sec\n',t);
+
+    global sys_params
+
+    % State extraction
+    x_b=x(1);
+    y_b=x(2);
+    x_p=x(3);
+    y_p = x(4);
+    Pg1 = x(5);
+    Pg2 = x(6);
+    Pg3 = x(7);
+    vx_b=x(8);
+    vy_b=x(9);
+    vx_p=x(10);
+    vy_p=x(11);
+    e_xp = x(12);
+    e_yp = x(13);
+
+
+    % Extract important sys parameters
+    tau = sys_params.tau;
+    m_t = sys_params.m_t;
+    m_p = sys_params.m_p;
+
+
+    % Force calculation
+    f_x=sys_params.f_x_nl(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_y=sys_params.f_y_nl(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_x_p = sys_params.f_x_p(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+    f_y_p = sys_params.f_y_p(x_b,y_b,x_p,y_p,Pg1,Pg2,Pg3,vx_b,vy_b,vx_p,vy_p);
+
+
+    % State equations
+    y_ss = sys_params.y_ss(t);
+    r = sys_params.r(t);
+    u = sys_params.u(x,sys_params.K,r);
+
+    pen_tip = sys_params.C_pen*xabs2lin(x);
+    pen_tip = pen_tip(1:2,:);
+
+
+    % Return the state derivatives
+    xdot = [vx_b;
+            vy_b;
+            vx_p;
+            vy_p;
+            -1/tau * (Pg1 - u(1));
+            -1/tau * (Pg2 - u(2));
+            -1/tau * (Pg3 - u(3));
+            f_x/m_t;
+            f_y/m_t;
+            f_x_p/m_p;
+            f_y_p/m_p;
+            y_ss(1)-pen_tip(1);
+            y_ss(2)-pen_tip(2)];
+end
+
 function x_lin = xabs2lin(x_abs)
     global sys_params
     
     x_lin = x_abs;
-    x_lin(5) = x_lin(5)-sys_params.Pg_op;
-    x_lin(6) = x_lin(6)-sys_params.Pg_op;
-    x_lin(7) = x_lin(7)-sys_params.Pg_op;
+    x_lin(5,:) = x_lin(5,:)-sys_params.Pg_op;
+    x_lin(6,:) = x_lin(6,:)-sys_params.Pg_op;
+    x_lin(7,:) = x_lin(7,:)-sys_params.Pg_op;
 
 end
 
@@ -691,9 +1056,9 @@ function x_abs = xlin2abs(x_lin)
     global sys_params
     
     x_abs = x_lin;
-    x_abs(5) = x_lin(5)+sys_params.Pg_op;
-    x_abs(6) = x_lin(6)+sys_params.Pg_op;
-    x_abs(7) = x_lin(7)+sys_params.Pg_op;
+    x_abs(5,:) = x_lin(5,:)+sys_params.Pg_op;
+    x_abs(6,:) = x_lin(6,:)+sys_params.Pg_op;
+    x_abs(7,:) = x_lin(7,:)+sys_params.Pg_op;
 
 end
 
@@ -705,7 +1070,6 @@ function u_lin = uabs2lin(u_abs)
 
 end
 
-
 function u_abs = ulin2abs(u_lin)
     global sys_params
     
@@ -713,12 +1077,39 @@ function u_abs = ulin2abs(u_lin)
     
 end
 
-
-function x_with_p = xfill_init_pressures(x)
+function x_with_p = xfill_init_pressures_l(x)
     global sys_params
 
-    f_x_nl = sys_params.f_x_nl;
-    f_y_nl = sys_params.f_y_nl;
+    f_x_l = sys_params.dfx;
+    f_y_l = sys_params.dfy;
+
+    % State extraction
+    x_b=x(1);
+    y_b=x(2);
+    x_p=x(3);
+    y_p =x(4);
+    vx_b=x(8);
+    vy_b=x(9);
+    vx_p=x(10);
+    vy_p=x(11);
+
+    syms Pg1 Pg2 Pg3
+    eqn3= Pg1 + Pg2 + Pg3 ==0;
+    soln = vpasolve([subs(f_x_l)==0, subs(f_y_l)==0, eqn3],[Pg1, Pg2, Pg3]);
+
+    x_with_p = x;
+    x_with_p(5)=soln.Pg1(1);
+    x_with_p(6)=soln.Pg2(1);
+    x_with_p(7)=soln.Pg3(1);
+    x_with_p = xlin2abs(x_with_p);
+
+end
+
+function x_with_p = xfill_init_pressures_nl(x)
+    global sys_params
+
+    f_x_nl = sys_params.f_x_nl_sym;
+    f_y_nl = sys_params.f_y_nl_sym;
 
     % State extraction
     x_b=x(1);
@@ -735,8 +1126,52 @@ function x_with_p = xfill_init_pressures(x)
     soln = vpasolve([subs(f_x_nl)==0, subs(f_y_nl)==0, eqn3],[Pg1, Pg2, Pg3]);
 
     x_with_p = x;
-    x_with_p(5)=soln.Pg1(1)
-    x_with_p(6)=soln.Pg2(1)
-    x_with_p(7)=soln.Pg3(1)
+    x_with_p(5)=soln.Pg1(1);
+    x_with_p(6)=soln.Pg2(1);
+    x_with_p(7)=soln.Pg3(1);
+
+end
+
+function [x_b, y_b, x_p, y_p] = get_coord_from_states(x)
+    global sys_params
+
+    out1=sys_params.C*x;
+    x_b=out1(1,:);
+    y_b=out1(2,:);
+
+    out2=sys_params.C_pen*x;
+    x_p=out2(1,:);
+    y_p=out2(2,:);
+end
+
+function [t_sim, y_ss, r, x0] = get_trajectory(traj_name,sketch_time)
+    global sys_params
+
+    traj_path = '..\python_scripts\test_images';
+    traj_path = strrep(traj_path, "\", filesep);
+    
+
+    max_coord = 0.04; %max coordinate
+    filepath = fullfile(traj_path,traj_name);
+    traj = readmatrix(filepath);
+    traj(:,1)=traj(:,1) - (min(traj(:,1))+max(traj(:,1)))/2; %Center x
+    traj(:,2)=traj(:,2) - (min(traj(:,2))+max(traj(:,2)))/2; %Center y
+    traj = traj./max(traj, [], 'all').*max_coord; %scale
+    traj(:,2)=-traj(:,2); %Flip y
+    
+    
+    
+    t_sim = linspace(0,sketch_time,length(traj));
+    y_ss = [traj';zeros(1,length(traj))];
+    r = sys_params.pp_matrix*y_ss;
+
+    
+    x0=[y_ss(1,1); y_ss(2,1); y_ss(1,1); y_ss(2,1); 0; 0; 0; 0; 0; 0; 0; 0; 0];
+    num_settle =50;
+    t_settle = linspace(-0.1,-0.001,num_settle);
+
+    t_sim = [t_settle,t_sim];
+    y_ss = [ones(1,num_settle).*y_ss(:,1),y_ss];
+    r = [ones(1,num_settle).*r(:,1),r];
 
 end

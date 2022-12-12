@@ -1,4 +1,4 @@
-function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
+function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p,window_size)
 
     pt_rad = 0.01; % Base point circule radius 
 
@@ -12,14 +12,17 @@ function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
 
     % Initialize video
     myVideo = VideoWriter(strcat(name,'.mp4'),'MPEG-4'); %open video file
-    myVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
+    myVideo.FrameRate = 20;  %can adjust this, 5 - 10 works well for me
     open(myVideo)
     
     
-
+    i_pos=1;
 
     for i = 1: length(t)
         
+        if(t(i)<=0)
+            i_pos=i;
+        end
     
         clf;
         b_t = eye(2); 
@@ -40,14 +43,12 @@ function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
 
 
         % Plot all pen points thus far
-        for j = 1:i 
-            plot(x_p(1:j),y_p(1:j),'r.-')
-            hold on;
-        end
+        plot(x_p(i_pos:i),y_p(i_pos:i),'r.-','LineWidth',0.3,'MarkerSize',3);
+        hold on;
 
         scatter([b_1(1),b_2(1),b_3(1)],[b_1(2),b_2(2),b_3(2)],50,'bo','filled');
         
-        scatter(x_p(i),y_p(i),50,'rx');
+        scatter(x_p(i),y_p(i),50,'mx');
 
     
         
@@ -56,7 +57,7 @@ function [myVideo] = draw_sys(name,l,r,t,x_b,y_b,x_p,y_p)
         line([p2(1),p3(1)], [p2(2), p3(2)], 'Color', 'b','LineWidth',2);
         line([p1(1),p3(1)], [p1(2), p3(2)], 'Color', 'b','LineWidth',2);
         title( sprintf('time = %.3f sec', t(i)) );
-        axis([-1 1 -1 1]* (l+r)*0.5);
+        axis([-1 1 -1 1]* window_size);
 
 
         drawnow;
